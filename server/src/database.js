@@ -81,6 +81,50 @@ function initializeDatabase() {
     )
   `);
 
+  // Case notes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS case_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Communication log table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS communications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      communication_date TEXT NOT NULL,
+      type TEXT NOT NULL,
+      contact_person TEXT,
+      summary TEXT,
+      follow_up_required INTEGER DEFAULT 0,
+      follow_up_date TEXT,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Documents table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      file_name TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER,
+      mime_type TEXT,
+      category TEXT NOT NULL,
+      uploaded_by INTEGER NOT NULL REFERENCES users(id),
+      uploaded_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   console.log('Database initialized successfully');
 }
 

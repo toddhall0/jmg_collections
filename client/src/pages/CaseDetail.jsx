@@ -3,6 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../utils/api'
 import { formatCurrency, formatDate, formatDateTime } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
+import CaseNotes from '../components/CaseNotes'
+import CommunicationLog from '../components/CommunicationLog'
+import CaseDocuments from '../components/CaseDocuments'
 
 export default function CaseDetail() {
   const { id } = useParams()
@@ -408,6 +411,16 @@ export default function CaseDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Notes, Communications, and Documents sections */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+        <CaseNotes caseId={id} />
+        <CommunicationLog caseId={id} />
+      </div>
+
+      <div style={{ marginTop: '24px' }}>
+        <CaseDocuments caseId={id} />
       </div>
 
       {showAssignModal && (
