@@ -9,6 +9,7 @@ import caseRoutes from './routes/cases.js';
 import notesRoutes from './routes/notes.js';
 import communicationsRoutes from './routes/communications.js';
 import documentsRoutes from './routes/documents.js';
+import tasksRoutes from './routes/tasks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/cases', caseRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/communications', communicationsRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/tasks', tasksRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

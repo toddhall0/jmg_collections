@@ -132,6 +132,136 @@ router.get('/options', authenticateToken, (req, res) => {
   });
 });
 
+// Get pipeline data (cases grouped by stage with overdue task info)
+// IMPORTANT: This route must be before /:id to avoid path matching conflicts
+router.get('/pipeline', authenticateToken, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+
+  let caseQuery = `
+    SELECT c.*,
+           GROUP_CONCAT(DISTINCT u.full_name) as assigned_counsel,
+           (SELECT COUNT(*) FROM tasks t WHERE t.case_id = c.id AND t.due_date < ? AND t.status != 'Complete') as overdue_tasks
+    FROM cases c
+    LEFT JOIN case_assignments ca ON c.id = ca.case_id
+    LEFT JOIN users u ON ca.user_id = u.id
+  `;
+
+  const values = [today];
+
+  // Role-based filtering for local counsel
+  if (req.user.role === 'local_counsel') {
+    caseQuery += ` WHERE c.id IN (SELECT case_id FROM case_assignments WHERE user_id = ?)`;
+    values.push(req.user.id);
+  }
+
+  caseQuery += ` GROUP BY c.id ORDER BY c.date_opened DESC`;
+
+  const cases = db.prepare(caseQuery).all(...values);
+
+  // Group cases by stage
+  const pipeline = {};
+  for (const stage of VALID_STAGES) {
+    pipeline[stage] = {
+      cases: [],
+      count: 0,
+      total_amount: 0
+    };
+  }
+
+  for (const caseItem of cases) {
+    if (pipeline[caseItem.current_stage]) {
+      pipeline[caseItem.current_stage].cases.push(caseItem);
+      pipeline[caseItem.current_stage].count++;
+      pipeline[caseItem.current_stage].total_amount += caseItem.amount_claimed || 0;
+    }
+  }
+
+  res.json({ pipeline, stages: VALID_STAGES });
+});
+
+// Get upcoming deadlines
+router.get('/deadlines', authenticateToken, (req, res) => {
+  const today = new Date();
+  const thirtyDaysFromNow = new Date(today);
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+  const todayStr = today.toISOString().split('T')[0];
+  const futureStr = thirtyDaysFromNow.toISOString().split('T')[0];
+
+  let baseCondition = '';
+  const values = [];
+
+  if (req.user.role === 'local_counsel') {
+    baseCondition = 'AND c.id IN (SELECT case_id FROM case_assignments WHERE user_id = ?)';
+    values.push(req.user.id);
+  }
+
+  // Get all deadline types
+  const deadlines = [];
+
+  // Initial Notice Response Deadlines
+  const initialNoticeDeadlines = db.prepare(`
+    SELECT c.id, c.case_number, c.defendant_name, c.initial_notice_response_deadline as deadline_date,
+           'Initial Notice Response' as deadline_type
+    FROM cases c
+    WHERE c.initial_notice_response_deadline IS NOT NULL
+      AND c.initial_notice_response_deadline <= ?
+      AND c.resolution_status = 'Open'
+      ${baseCondition}
+  `).all(futureStr, ...values);
+
+  // Second Notice Response Deadlines
+  const secondNoticeDeadlines = db.prepare(`
+    SELECT c.id, c.case_number, c.defendant_name, c.second_notice_response_deadline as deadline_date,
+           'Second Notice Response' as deadline_type
+    FROM cases c
+    WHERE c.second_notice_response_deadline IS NOT NULL
+      AND c.second_notice_response_deadline <= ?
+      AND c.resolution_status = 'Open'
+      ${baseCondition}
+  `).all(futureStr, ...values);
+
+  // Statute of Limitations Deadlines
+  const solDeadlines = db.prepare(`
+    SELECT c.id, c.case_number, c.defendant_name, c.statute_of_limitations_date as deadline_date,
+           'Statute of Limitations' as deadline_type
+    FROM cases c
+    WHERE c.statute_of_limitations_date IS NOT NULL
+      AND c.statute_of_limitations_date <= ?
+      AND c.resolution_status = 'Open'
+      ${baseCondition}
+  `).all(futureStr, ...values);
+
+  // Task Due Dates
+  const taskDeadlines = db.prepare(`
+    SELECT c.id, c.case_number, c.defendant_name, t.due_date as deadline_date,
+           'Task: ' || t.description as deadline_type
+    FROM tasks t
+    JOIN cases c ON t.case_id = c.id
+    WHERE t.due_date <= ?
+      AND t.status != 'Complete'
+      AND c.resolution_status = 'Open'
+      ${baseCondition}
+  `).all(futureStr, ...values);
+
+  deadlines.push(...initialNoticeDeadlines, ...secondNoticeDeadlines, ...solDeadlines, ...taskDeadlines);
+
+  // Sort by deadline date
+  deadlines.sort((a, b) => a.deadline_date.localeCompare(b.deadline_date));
+
+  // Add days until due
+  for (const deadline of deadlines) {
+    const deadlineDate = new Date(deadline.deadline_date);
+    const diffTime = deadlineDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    deadline.days_until_due = diffDays;
+    deadline.is_overdue = diffDays < 0;
+    deadline.is_due_soon = diffDays >= 0 && diffDays <= 7;
+  }
+
+  res.json({ deadlines });
+});
+
 // Get single case
 router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
   const caseData = db.prepare(`
@@ -175,7 +305,11 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
     statute_of_limitations_date,
     claim_description,
     current_stage,
-    resolution_status
+    resolution_status,
+    initial_notice_sent_date,
+    initial_notice_response_deadline,
+    second_notice_sent_date,
+    second_notice_response_deadline
   } = req.body;
 
   // Validation
@@ -201,6 +335,21 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 
   const case_number = generateCaseNumber();
 
+  // Auto-calculate response deadlines if sent dates provided but deadlines not specified
+  let calculatedInitialDeadline = initial_notice_response_deadline;
+  if (initial_notice_sent_date && !initial_notice_response_deadline) {
+    const sentDate = new Date(initial_notice_sent_date);
+    sentDate.setDate(sentDate.getDate() + 14);
+    calculatedInitialDeadline = sentDate.toISOString().split('T')[0];
+  }
+
+  let calculatedSecondDeadline = second_notice_response_deadline;
+  if (second_notice_sent_date && !second_notice_response_deadline) {
+    const sentDate = new Date(second_notice_sent_date);
+    sentDate.setDate(sentDate.getDate() + 10);
+    calculatedSecondDeadline = sentDate.toISOString().split('T')[0];
+  }
+
   try {
     const result = db.prepare(`
       INSERT INTO cases (
@@ -209,8 +358,11 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
         defendant_email, defendant_phone, defendant_mailing_address,
         defendant_state, amount_claimed, date_claim_arose,
         statute_of_limitations_date, claim_description, current_stage,
-        resolution_status, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        resolution_status, created_by,
+        initial_notice_sent_date, initial_notice_response_deadline,
+        second_notice_sent_date, second_notice_response_deadline,
+        stage_changed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(
       case_number,
       case_name,
@@ -229,7 +381,11 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
       claim_description || null,
       current_stage || 'Intake',
       resolution_status || 'Open',
-      req.user.id
+      req.user.id,
+      initial_notice_sent_date || null,
+      calculatedInitialDeadline || null,
+      second_notice_sent_date || null,
+      calculatedSecondDeadline || null
     );
 
     const newCase = db.prepare('SELECT * FROM cases WHERE id = ?').get(result.lastInsertRowid);
@@ -259,7 +415,9 @@ router.put('/:id', authenticateToken, canEditCase, (req, res) => {
     'defendant_email', 'defendant_phone', 'defendant_mailing_address',
     'defendant_state', 'amount_claimed', 'date_claim_arose',
     'statute_of_limitations_date', 'claim_description', 'current_stage',
-    'resolution_status', 'amount_recovered', 'date_closed'
+    'resolution_status', 'amount_recovered', 'date_closed',
+    'initial_notice_sent_date', 'initial_notice_response_deadline',
+    'second_notice_sent_date', 'second_notice_response_deadline'
   ];
 
   const allowedFields = req.localCounselEdit ? localCounselFields : allFields;
@@ -267,11 +425,22 @@ router.put('/:id', authenticateToken, canEditCase, (req, res) => {
   const updates = [];
   const values = [];
 
+  // Track if stage is changing for logging
+  let stageChanging = false;
+  let oldStage = existingCase.current_stage;
+  let newStage = null;
+
   for (const field of allowedFields) {
     if (req.body[field] !== undefined) {
       // Validation
-      if (field === 'current_stage' && !VALID_STAGES.includes(req.body[field])) {
-        return res.status(400).json({ error: 'Invalid stage' });
+      if (field === 'current_stage') {
+        if (!VALID_STAGES.includes(req.body[field])) {
+          return res.status(400).json({ error: 'Invalid stage' });
+        }
+        if (req.body[field] !== existingCase.current_stage) {
+          stageChanging = true;
+          newStage = req.body[field];
+        }
       }
       if (field === 'resolution_status' && !VALID_RESOLUTION_STATUSES.includes(req.body[field])) {
         return res.status(400).json({ error: 'Invalid resolution status' });
@@ -288,14 +457,43 @@ router.put('/:id', authenticateToken, canEditCase, (req, res) => {
     }
   }
 
+  // Auto-calculate response deadlines if sent dates provided
+  if (req.body.initial_notice_sent_date && !req.body.initial_notice_response_deadline) {
+    const sentDate = new Date(req.body.initial_notice_sent_date);
+    sentDate.setDate(sentDate.getDate() + 14);
+    updates.push('initial_notice_response_deadline = ?');
+    values.push(sentDate.toISOString().split('T')[0]);
+  }
+
+  if (req.body.second_notice_sent_date && !req.body.second_notice_response_deadline) {
+    const sentDate = new Date(req.body.second_notice_sent_date);
+    sentDate.setDate(sentDate.getDate() + 10);
+    updates.push('second_notice_response_deadline = ?');
+    values.push(sentDate.toISOString().split('T')[0]);
+  }
+
   if (updates.length === 0) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
-  updates.push('updated_at = datetime("now")');
+  // If stage is changing, update stage_changed_at
+  if (stageChanging) {
+    updates.push("stage_changed_at = datetime('now')");
+  }
+
+  updates.push("updated_at = datetime('now')");
   values.push(caseId);
 
   db.prepare(`UPDATE cases SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  // Create a note for stage change
+  if (stageChanging) {
+    const noteContent = `Stage changed from "${oldStage}" to "${newStage}"`;
+    db.prepare(`
+      INSERT INTO case_notes (case_id, content, created_by)
+      VALUES (?, ?, ?)
+    `).run(caseId, noteContent, req.user.id);
+  }
 
   const updatedCase = db.prepare('SELECT * FROM cases WHERE id = ?').get(caseId);
   res.json({ case: updatedCase, message: 'Case updated successfully' });

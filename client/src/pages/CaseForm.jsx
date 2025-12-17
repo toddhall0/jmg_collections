@@ -35,7 +35,11 @@ export default function CaseForm() {
     current_stage: 'Intake',
     resolution_status: 'Open',
     amount_recovered: '0',
-    date_closed: ''
+    date_closed: '',
+    initial_notice_sent_date: '',
+    initial_notice_response_deadline: '',
+    second_notice_sent_date: '',
+    second_notice_response_deadline: ''
   })
 
   useEffect(() => {
@@ -76,7 +80,11 @@ export default function CaseForm() {
         current_stage: caseData.current_stage || 'Intake',
         resolution_status: caseData.resolution_status || 'Open',
         amount_recovered: caseData.amount_recovered?.toString() || '0',
-        date_closed: caseData.date_closed || ''
+        date_closed: caseData.date_closed || '',
+        initial_notice_sent_date: caseData.initial_notice_sent_date || '',
+        initial_notice_response_deadline: caseData.initial_notice_response_deadline || '',
+        second_notice_sent_date: caseData.second_notice_sent_date || '',
+        second_notice_response_deadline: caseData.second_notice_response_deadline || ''
       })
     } catch (err) {
       setError(err.message)
@@ -87,7 +95,23 @@ export default function CaseForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value }
+
+      // Auto-calculate response deadlines
+      if (name === 'initial_notice_sent_date' && value) {
+        const date = new Date(value)
+        date.setDate(date.getDate() + 14)
+        updated.initial_notice_response_deadline = date.toISOString().split('T')[0]
+      }
+      if (name === 'second_notice_sent_date' && value) {
+        const date = new Date(value)
+        date.setDate(date.getDate() + 10)
+        updated.second_notice_response_deadline = date.toISOString().split('T')[0]
+      }
+
+      return updated
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -370,6 +394,66 @@ export default function CaseForm() {
               onChange={handleChange}
               rows={4}
             />
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: '20px' }}>Deadline Tracking</h3>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="initial_notice_sent_date">Initial Notice Sent Date</label>
+              <input
+                type="date"
+                id="initial_notice_sent_date"
+                name="initial_notice_sent_date"
+                value={formData.initial_notice_sent_date}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="initial_notice_response_deadline">
+                Response Deadline
+                <span style={{ fontSize: '11px', color: 'var(--gray-500)', marginLeft: '8px' }}>
+                  (auto: 14 days)
+                </span>
+              </label>
+              <input
+                type="date"
+                id="initial_notice_response_deadline"
+                name="initial_notice_response_deadline"
+                value={formData.initial_notice_response_deadline}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="second_notice_sent_date">Second Notice Sent Date</label>
+              <input
+                type="date"
+                id="second_notice_sent_date"
+                name="second_notice_sent_date"
+                value={formData.second_notice_sent_date}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="second_notice_response_deadline">
+                Response Deadline
+                <span style={{ fontSize: '11px', color: 'var(--gray-500)', marginLeft: '8px' }}>
+                  (auto: 10 days)
+                </span>
+              </label>
+              <input
+                type="date"
+                id="second_notice_response_deadline"
+                name="second_notice_response_deadline"
+                value={formData.second_notice_response_deadline}
+                onChange={handleChange}
+              />
+            </div>
           </div>
         </div>
 

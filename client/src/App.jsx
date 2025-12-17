@@ -7,6 +7,8 @@ import CaseList from './pages/CaseList'
 import CaseDetail from './pages/CaseDetail'
 import CaseForm from './pages/CaseForm'
 import UserManagement from './pages/UserManagement'
+import Pipeline from './pages/Pipeline'
+import Deadlines from './pages/Deadlines'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -58,6 +60,8 @@ export default function App() {
         <Route path="cases/new" element={<AdminRoute><CaseForm /></AdminRoute>} />
         <Route path="cases/:id" element={<CaseDetail />} />
         <Route path="cases/:id/edit" element={<AdminRoute><CaseForm /></AdminRoute>} />
+        <Route path="pipeline" element={<Pipeline />} />
+        <Route path="deadlines" element={<Deadlines />} />
         <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

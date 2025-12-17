@@ -125,6 +125,42 @@ function initializeDatabase() {
     )
   `);
 
+  // Tasks table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      assigned_to INTEGER NOT NULL REFERENCES users(id),
+      due_date TEXT NOT NULL,
+      priority TEXT NOT NULL DEFAULT 'Medium' CHECK(priority IN ('High', 'Medium', 'Low')),
+      status TEXT NOT NULL DEFAULT 'Not Started' CHECK(status IN ('Not Started', 'In Progress', 'Complete')),
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Add deadline tracking columns to cases table if they don't exist
+  const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
+  const columnNames = caseColumns.map(c => c.name);
+
+  if (!columnNames.includes('initial_notice_sent_date')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN initial_notice_sent_date TEXT`);
+  }
+  if (!columnNames.includes('initial_notice_response_deadline')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN initial_notice_response_deadline TEXT`);
+  }
+  if (!columnNames.includes('second_notice_sent_date')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN second_notice_sent_date TEXT`);
+  }
+  if (!columnNames.includes('second_notice_response_deadline')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN second_notice_response_deadline TEXT`);
+  }
+  if (!columnNames.includes('stage_changed_at')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN stage_changed_at TEXT`);
+  }
+
   console.log('Database initialized successfully');
 }
 

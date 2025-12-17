@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import CaseNotes from '../components/CaseNotes'
 import CommunicationLog from '../components/CommunicationLog'
 import CaseDocuments from '../components/CaseDocuments'
+import CaseTasks from '../components/CaseTasks'
 
 export default function CaseDetail() {
   const { id } = useParams()
@@ -361,6 +362,38 @@ export default function CaseDetail() {
           </div>
 
           <div className="card">
+            <h3 style={{ marginBottom: '16px' }}>Deadline Tracking</h3>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: 500, marginBottom: '8px', color: 'var(--gray-700)' }}>Initial Notice</div>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <div className="detail-label">Sent Date</div>
+                  <div className="detail-value">{formatDate(caseData.initial_notice_sent_date) || '-'}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-label">Response Deadline</div>
+                  <div className="detail-value">{formatDate(caseData.initial_notice_response_deadline) || '-'}</div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 500, marginBottom: '8px', color: 'var(--gray-700)' }}>Second Notice</div>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <div className="detail-label">Sent Date</div>
+                  <div className="detail-value">{formatDate(caseData.second_notice_sent_date) || '-'}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="detail-label">Response Deadline</div>
+                  <div className="detail-value">{formatDate(caseData.second_notice_response_deadline) || '-'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
             <div className="card-header" style={{ marginBottom: '12px' }}>
               <h3>Assigned Counsel</h3>
               {isAdmin && availableCounsel.length > 0 && (
@@ -411,6 +444,11 @@ export default function CaseDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Tasks section */}
+      <div style={{ marginTop: '24px' }}>
+        <CaseTasks caseId={id} />
       </div>
 
       {/* Notes, Communications, and Documents sections */}
