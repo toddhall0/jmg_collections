@@ -26,7 +26,7 @@ function initializeDatabase() {
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       full_name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('admin', 'client', 'local_counsel')),
+      role TEXT NOT NULL CHECK(role IN ('admin', 'internal_counsel', 'client', 'local_counsel')),
       active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -382,6 +382,49 @@ function initializeDatabase() {
       insertCategory.run(cat.name, cat.code, cat.description, cat.default_claim_language, cat.display_order);
     }
     console.log('Default case categories created');
+  }
+
+  // Migration: Fix users table CHECK constraint to include 'internal_counsel'
+  // SQLite doesn't allow ALTER of CHECK constraints, so we need to recreate the table
+  const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+  if (tableInfo && tableInfo.sql && !tableInfo.sql.includes('internal_counsel')) {
+    console.log('Migrating users table to add internal_counsel role...');
+
+    // Disable foreign keys temporarily for the migration
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`
+      -- Drop users_new if it exists from a previous failed migration
+      DROP TABLE IF EXISTS users_new;
+
+      -- Create new table with correct constraint
+      CREATE TABLE users_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('admin', 'internal_counsel', 'client', 'local_counsel')),
+        active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      -- Copy existing data
+      INSERT INTO users_new (id, username, email, password, full_name, role, active, created_at, updated_at)
+      SELECT id, username, email, password, full_name, role, active, created_at, updated_at FROM users;
+
+      -- Drop old table
+      DROP TABLE users;
+
+      -- Rename new table
+      ALTER TABLE users_new RENAME TO users;
+    `);
+
+    // Re-enable foreign keys
+    db.pragma('foreign_keys = ON');
+
+    console.log('Users table migration complete');
   }
 
   // Create default admin user if no users exist
