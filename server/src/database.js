@@ -141,6 +141,42 @@ function initializeDatabase() {
     )
   `);
 
+  // Local Counsel Contacts table (directory of external counsel)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS local_counsel_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firm_name TEXT NOT NULL,
+      attorney_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      address TEXT,
+      states_covered TEXT,
+      hourly_rate REAL,
+      retainer_required REAL,
+      fee_arrangement_notes TEXT,
+      performance_rating TEXT DEFAULT 'Not Yet Rated' CHECK(performance_rating IN ('Excellent', 'Good', 'Satisfactory', 'Below Expectations', 'Not Yet Rated')),
+      notes TEXT,
+      status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive', 'Do Not Use')),
+      created_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Case share links table (for external read-only access)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS case_share_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      share_token TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      view_count INTEGER DEFAULT 0,
+      last_viewed_at TEXT
+    )
+  `);
+
   // Add deadline tracking columns to cases table if they don't exist
   const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
   const columnNames = caseColumns.map(c => c.name);
@@ -159,6 +195,20 @@ function initializeDatabase() {
   }
   if (!columnNames.includes('stage_changed_at')) {
     db.exec(`ALTER TABLE cases ADD COLUMN stage_changed_at TEXT`);
+  }
+
+  // Add local counsel assignment columns to cases table
+  if (!columnNames.includes('assigned_local_counsel_id')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN assigned_local_counsel_id INTEGER REFERENCES local_counsel_contacts(id)`);
+  }
+  if (!columnNames.includes('local_counsel_engagement_date')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN local_counsel_engagement_date TEXT`);
+  }
+  if (!columnNames.includes('local_counsel_fee_arrangement')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN local_counsel_fee_arrangement TEXT`);
+  }
+  if (!columnNames.includes('local_counsel_user_id')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN local_counsel_user_id INTEGER REFERENCES users(id)`);
   }
 
   console.log('Database initialized successfully');

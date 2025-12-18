@@ -45,15 +45,21 @@ router.get('/', authenticateToken, (req, res) => {
 
   // Role-based filtering
   if (req.user.role === 'local_counsel') {
+    // Local counsel can see cases where they are assigned via:
+    // 1. case_assignments table (legacy)
+    // 2. local_counsel_user_id field (new)
     query = `
       SELECT c.*,
-             GROUP_CONCAT(u.full_name) as assigned_counsel
+             GROUP_CONCAT(DISTINCT u.full_name) as assigned_counsel
       FROM cases c
-      INNER JOIN case_assignments ca ON c.id = ca.case_id
+      LEFT JOIN case_assignments ca ON c.id = ca.case_id
       LEFT JOIN users u ON ca.user_id = u.id
-      INNER JOIN case_assignments my_assignment ON c.id = my_assignment.case_id AND my_assignment.user_id = ?
+      WHERE (
+        c.local_counsel_user_id = ?
+        OR c.id IN (SELECT case_id FROM case_assignments WHERE user_id = ?)
+      )
     `;
-    values.push(req.user.id);
+    values.push(req.user.id, req.user.id);
   }
 
   // Filter by stage
@@ -76,7 +82,12 @@ router.get('/', authenticateToken, (req, res) => {
   }
 
   if (conditions.length > 0) {
-    query += ' WHERE ' + conditions.join(' AND ');
+    // For local_counsel, query already has WHERE clause, use AND
+    if (req.user.role === 'local_counsel') {
+      query += ' AND ' + conditions.join(' AND ');
+    } else {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
   }
 
   query += ' GROUP BY c.id';
@@ -266,9 +277,19 @@ router.get('/deadlines', authenticateToken, (req, res) => {
 router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
   const caseData = db.prepare(`
     SELECT c.*,
-           creator.full_name as created_by_name
+           creator.full_name as created_by_name,
+           lc.id as local_counsel_id,
+           lc.firm_name as local_counsel_firm,
+           lc.attorney_name as local_counsel_attorney,
+           lc.email as local_counsel_email,
+           lc.phone as local_counsel_phone,
+           lc.performance_rating as local_counsel_rating,
+           lcu.full_name as local_counsel_user_name,
+           lcu.email as local_counsel_user_email
     FROM cases c
     LEFT JOIN users creator ON c.created_by = creator.id
+    LEFT JOIN local_counsel_contacts lc ON c.assigned_local_counsel_id = lc.id
+    LEFT JOIN users lcu ON c.local_counsel_user_id = lcu.id
     WHERE c.id = ?
   `).get(req.params.id);
 
@@ -276,7 +297,7 @@ router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
     return res.status(404).json({ error: 'Case not found' });
   }
 
-  // Get assigned counsel
+  // Get assigned counsel (legacy user assignments)
   const assignments = db.prepare(`
     SELECT u.id, u.full_name, u.email, ca.assigned_at
     FROM case_assignments ca
@@ -566,6 +587,115 @@ router.delete('/:id/assign/:userId', authenticateToken, requireRole('admin'), (r
     .run(caseId, userId);
 
   res.json({ message: 'Assignment removed successfully' });
+});
+
+// Assign local counsel from directory to a case (admin only)
+router.post('/:id/local-counsel', authenticateToken, requireRole('admin'), (req, res) => {
+  const caseId = req.params.id;
+  const {
+    local_counsel_id,
+    engagement_date,
+    fee_arrangement,
+    user_id // optional - links to a user account for system access
+  } = req.body;
+
+  // Verify case exists
+  const caseData = db.prepare('SELECT id FROM cases WHERE id = ?').get(caseId);
+  if (!caseData) {
+    return res.status(404).json({ error: 'Case not found' });
+  }
+
+  // Verify local counsel contact exists if provided
+  if (local_counsel_id) {
+    const counsel = db.prepare('SELECT id, status FROM local_counsel_contacts WHERE id = ?').get(local_counsel_id);
+    if (!counsel) {
+      return res.status(404).json({ error: 'Local counsel contact not found' });
+    }
+    if (counsel.status === 'Do Not Use') {
+      return res.status(400).json({ error: 'This counsel is marked as "Do Not Use"' });
+    }
+  }
+
+  // Verify user exists if provided
+  if (user_id) {
+    const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(user_id);
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+    if (user.role !== 'local_counsel') {
+      return res.status(400).json({ error: 'User must have the local_counsel role' });
+    }
+  }
+
+  try {
+    db.prepare(`
+      UPDATE cases SET
+        assigned_local_counsel_id = ?,
+        local_counsel_engagement_date = ?,
+        local_counsel_fee_arrangement = ?,
+        local_counsel_user_id = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      local_counsel_id || null,
+      engagement_date || null,
+      fee_arrangement || null,
+      user_id || null,
+      caseId
+    );
+
+    // Create a note about the assignment
+    if (local_counsel_id) {
+      const counsel = db.prepare('SELECT firm_name, attorney_name FROM local_counsel_contacts WHERE id = ?').get(local_counsel_id);
+      const noteContent = `Local counsel assigned: ${counsel.attorney_name} (${counsel.firm_name})`;
+      db.prepare(`
+        INSERT INTO case_notes (case_id, content, created_by)
+        VALUES (?, ?, ?)
+      `).run(caseId, noteContent, req.user.id);
+    }
+
+    res.json({ message: 'Local counsel assigned successfully' });
+  } catch (error) {
+    console.error('Error assigning local counsel:', error);
+    res.status(500).json({ error: 'Failed to assign local counsel' });
+  }
+});
+
+// Remove local counsel from a case (admin only)
+router.delete('/:id/local-counsel', authenticateToken, requireRole('admin'), (req, res) => {
+  const caseId = req.params.id;
+
+  const caseData = db.prepare('SELECT id, assigned_local_counsel_id FROM cases WHERE id = ?').get(caseId);
+  if (!caseData) {
+    return res.status(404).json({ error: 'Case not found' });
+  }
+
+  if (!caseData.assigned_local_counsel_id) {
+    return res.status(400).json({ error: 'No local counsel is assigned to this case' });
+  }
+
+  try {
+    db.prepare(`
+      UPDATE cases SET
+        assigned_local_counsel_id = NULL,
+        local_counsel_engagement_date = NULL,
+        local_counsel_fee_arrangement = NULL,
+        local_counsel_user_id = NULL,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(caseId);
+
+    // Create a note about the removal
+    db.prepare(`
+      INSERT INTO case_notes (case_id, content, created_by)
+      VALUES (?, 'Local counsel removed from case', ?)
+    `).run(caseId, req.user.id);
+
+    res.json({ message: 'Local counsel removed successfully' });
+  } catch (error) {
+    console.error('Error removing local counsel:', error);
+    res.status(500).json({ error: 'Failed to remove local counsel' });
+  }
 });
 
 export default router;

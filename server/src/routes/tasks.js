@@ -52,6 +52,31 @@ router.get('/options', authenticateToken, (req, res) => {
   });
 });
 
+// Get all tasks assigned to current user (for My Tasks dashboard)
+router.get('/my-tasks', authenticateToken, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+
+  const tasks = db.prepare(`
+    SELECT t.*,
+           c.case_number,
+           c.case_name,
+           assignee.full_name as assigned_to_name,
+           creator.full_name as created_by_name,
+           CASE
+             WHEN t.due_date < ? AND t.status != 'Complete' THEN 1
+             ELSE 0
+           END as is_overdue
+    FROM tasks t
+    JOIN cases c ON t.case_id = c.id
+    JOIN users assignee ON t.assigned_to = assignee.id
+    JOIN users creator ON t.created_by = creator.id
+    WHERE t.assigned_to = ? AND t.status != 'Complete'
+    ORDER BY t.due_date ASC, t.priority DESC
+  `).all(today, req.user.id);
+
+  res.json({ tasks });
+});
+
 // Create a new task
 router.post('/case/:caseId', authenticateToken, canAccessCase, (req, res) => {
   const { caseId } = req.params;

@@ -7,6 +7,8 @@ import CaseNotes from '../components/CaseNotes'
 import CommunicationLog from '../components/CommunicationLog'
 import CaseDocuments from '../components/CaseDocuments'
 import CaseTasks from '../components/CaseTasks'
+import LocalCounselAssignment from '../components/LocalCounselAssignment'
+import ShareLink from '../components/ShareLink'
 
 export default function CaseDetail() {
   const { id } = useParams()
@@ -443,6 +445,12 @@ export default function CaseDetail() {
               </div>
             )}
           </div>
+
+          {/* Local Counsel Assignment */}
+          <LocalCounselAssignment caseId={id} caseData={caseData} onUpdate={loadCase} />
+
+          {/* Share Link */}
+          <ShareLink caseId={id} />
         </div>
       </div>
 

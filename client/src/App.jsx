@@ -9,6 +9,8 @@ import CaseForm from './pages/CaseForm'
 import UserManagement from './pages/UserManagement'
 import Pipeline from './pages/Pipeline'
 import Deadlines from './pages/Deadlines'
+import LocalCounselDirectory from './pages/LocalCounselDirectory'
+import SharedCaseView from './pages/SharedCaseView'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -46,6 +48,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Public shared case view - no authentication */}
+      <Route path="/shared/case/:token" element={<SharedCaseView />} />
       <Route
         path="/"
         element={
@@ -62,6 +66,7 @@ export default function App() {
         <Route path="cases/:id/edit" element={<AdminRoute><CaseForm /></AdminRoute>} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="deadlines" element={<Deadlines />} />
+        <Route path="local-counsel" element={<AdminRoute><LocalCounselDirectory /></AdminRoute>} />
         <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

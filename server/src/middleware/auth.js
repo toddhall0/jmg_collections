@@ -71,12 +71,16 @@ export function canAccessCase(req, res, next) {
 
   // Local counsel can only access assigned cases
   if (req.user.role === 'local_counsel') {
-    const assignment = db.prepare(`
-      SELECT id FROM case_assignments
-      WHERE case_id = ? AND user_id = ?
-    `).get(caseId, req.user.id);
+    // Check both case_assignments table and local_counsel_user_id field
+    const hasAccess = db.prepare(`
+      SELECT 1 FROM cases c
+      WHERE c.id = ? AND (
+        c.local_counsel_user_id = ?
+        OR EXISTS (SELECT 1 FROM case_assignments WHERE case_id = c.id AND user_id = ?)
+      )
+    `).get(caseId, req.user.id, req.user.id);
 
-    if (!assignment) {
+    if (!hasAccess) {
       return res.status(403).json({ error: 'You are not assigned to this case' });
     }
   }
@@ -94,12 +98,16 @@ export function canEditCase(req, res, next) {
   // Local counsel can update certain fields on assigned cases
   if (req.user.role === 'local_counsel') {
     const caseId = req.params.id;
-    const assignment = db.prepare(`
-      SELECT id FROM case_assignments
-      WHERE case_id = ? AND user_id = ?
-    `).get(caseId, req.user.id);
+    // Check both case_assignments table and local_counsel_user_id field
+    const hasAccess = db.prepare(`
+      SELECT 1 FROM cases c
+      WHERE c.id = ? AND (
+        c.local_counsel_user_id = ?
+        OR EXISTS (SELECT 1 FROM case_assignments WHERE case_id = c.id AND user_id = ?)
+      )
+    `).get(caseId, req.user.id, req.user.id);
 
-    if (!assignment) {
+    if (!hasAccess) {
       return res.status(403).json({ error: 'You are not assigned to this case' });
     }
 

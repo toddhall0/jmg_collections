@@ -10,6 +10,8 @@ import notesRoutes from './routes/notes.js';
 import communicationsRoutes from './routes/communications.js';
 import documentsRoutes from './routes/documents.js';
 import tasksRoutes from './routes/tasks.js';
+import localCounselRoutes from './routes/localCounsel.js';
+import shareLinksRoutes from './routes/shareLinks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -39,6 +41,8 @@ app.use('/api/notes', notesRoutes);
 app.use('/api/communications', communicationsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/local-counsel', localCounselRoutes);
+app.use('/api/share-links', shareLinksRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

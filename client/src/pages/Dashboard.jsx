@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [recentCases, setRecentCases] = useState([])
+  const [myTasks, setMyTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const { user, isAdmin, isLocalCounsel } = useAuth()
 
@@ -16,16 +17,27 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [statsData, casesData] = await Promise.all([
+      const [statsData, casesData, tasksData] = await Promise.all([
         api.get('/cases/stats'),
-        api.get('/cases?sort_by=date_opened&sort_order=desc')
+        api.get('/cases?sort_by=date_opened&sort_order=desc'),
+        api.get('/tasks/my-tasks')
       ])
       setStats(statsData)
       setRecentCases(casesData.cases.slice(0, 5))
+      setMyTasks(tasksData.tasks || [])
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const updateTaskStatus = async (taskId, newStatus) => {
+    try {
+      await api.put(`/tasks/${taskId}`, { status: newStatus })
+      loadData()
+    } catch (error) {
+      alert('Error updating task: ' + error.message)
     }
   }
 
@@ -42,6 +54,15 @@ export default function Dashboard() {
       'Abandoned': 'badge-abandoned'
     }
     return classes[status] || 'badge-stage'
+  }
+
+  const getPriorityBadgeClass = (priority) => {
+    const classes = {
+      'High': 'badge-danger',
+      'Medium': 'badge-warning',
+      'Low': 'badge-info'
+    }
+    return classes[priority] || 'badge-secondary'
   }
 
   return (
@@ -138,7 +159,70 @@ export default function Dashboard() {
         )}
       </div>
 
-      {stats?.by_stage?.length > 0 && (
+      {/* My Tasks Section */}
+      {myTasks.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2>My Tasks</h2>
+            <span className="badge badge-secondary">{myTasks.length} pending</span>
+          </div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Case</th>
+                  <th>Due Date</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myTasks.slice(0, 10).map((task) => (
+                  <tr key={task.id} style={task.is_overdue ? { background: 'rgba(239, 68, 68, 0.05)' } : {}}>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{task.description}</div>
+                    </td>
+                    <td>
+                      <Link to={`/cases/${task.case_id}`} className="table-link">
+                        {task.case_number}
+                      </Link>
+                    </td>
+                    <td>
+                      <span style={{ color: task.is_overdue ? 'var(--danger)' : 'inherit' }}>
+                        {formatDate(task.due_date)}
+                        {task.is_overdue && <span style={{ marginLeft: '4px', fontSize: '11px' }}>(Overdue)</span>}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>
+                        {task.priority}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge badge-stage">{task.status}</span>
+                    </td>
+                    <td>
+                      <select
+                        value={task.status}
+                        onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                        style={{ fontSize: '13px', padding: '4px 8px' }}
+                      >
+                        <option value="Not Started">Not Started</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Complete">Complete</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {stats?.by_stage?.length > 0 && !isLocalCounsel && (
         <div className="card">
           <div className="card-header">
             <h2>Cases by Stage</h2>
