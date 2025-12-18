@@ -203,11 +203,11 @@ router.get('/upcoming-deadlines', authenticateToken, (req, res) => {
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 15;
 
   const deadlines = [];
 
-  // Task deadlines
+  // Task deadlines (upcoming and overdue)
   const taskDeadlines = db.prepare(`
     SELECT
       c.id as case_id,
@@ -215,52 +215,55 @@ router.get('/upcoming-deadlines', authenticateToken, (req, res) => {
       c.defendant_name,
       t.due_date as deadline_date,
       'Task: ' || SUBSTR(t.description, 1, 50) as deadline_type,
-      t.priority
+      t.priority,
+      'task' as source
     FROM tasks t
     JOIN cases c ON t.case_id = c.id
-    WHERE t.due_date >= ? AND t.status != 'Complete' AND c.resolution_status = 'Open'
+    WHERE t.status != 'Complete' AND c.resolution_status = 'Open'
     ORDER BY t.due_date ASC
     LIMIT ?
-  `).all(today, limit);
+  `).all(limit * 2);
   deadlines.push(...taskDeadlines);
 
-  // Initial notice response deadlines
+  // Initial notice response deadlines (all open cases with this deadline set)
   const initialDeadlines = db.prepare(`
     SELECT
       id as case_id,
       case_number,
       defendant_name,
       initial_notice_response_deadline as deadline_date,
-      'Initial Notice Response' as deadline_type,
-      'High' as priority
+      'Initial Notice Response Due' as deadline_type,
+      'High' as priority,
+      'response_deadline' as source
     FROM cases
-    WHERE initial_notice_response_deadline >= ?
+    WHERE initial_notice_response_deadline IS NOT NULL
+      AND initial_notice_response_deadline != ''
       AND resolution_status = 'Open'
-      AND current_stage LIKE '%Initial Notice%'
     ORDER BY initial_notice_response_deadline ASC
     LIMIT ?
-  `).all(today, limit);
+  `).all(limit);
   deadlines.push(...initialDeadlines);
 
-  // Second notice response deadlines
+  // Second notice response deadlines (all open cases with this deadline set)
   const secondDeadlines = db.prepare(`
     SELECT
       id as case_id,
       case_number,
       defendant_name,
       second_notice_response_deadline as deadline_date,
-      'Second Notice Response' as deadline_type,
-      'High' as priority
+      'Second Notice Response Due' as deadline_type,
+      'High' as priority,
+      'response_deadline' as source
     FROM cases
-    WHERE second_notice_response_deadline >= ?
+    WHERE second_notice_response_deadline IS NOT NULL
+      AND second_notice_response_deadline != ''
       AND resolution_status = 'Open'
-      AND current_stage LIKE '%Second Notice%'
     ORDER BY second_notice_response_deadline ASC
     LIMIT ?
-  `).all(today, limit);
+  `).all(limit);
   deadlines.push(...secondDeadlines);
 
-  // Statute of limitations
+  // Statute of limitations (critical - always show)
   const solDeadlines = db.prepare(`
     SELECT
       id as case_id,
@@ -268,23 +271,27 @@ router.get('/upcoming-deadlines', authenticateToken, (req, res) => {
       defendant_name,
       statute_of_limitations_date as deadline_date,
       'Statute of Limitations' as deadline_type,
-      'High' as priority
+      'High' as priority,
+      'sol' as source
     FROM cases
-    WHERE statute_of_limitations_date >= ? AND resolution_status = 'Open'
+    WHERE statute_of_limitations_date IS NOT NULL
+      AND statute_of_limitations_date != ''
+      AND resolution_status = 'Open'
     ORDER BY statute_of_limitations_date ASC
     LIMIT ?
-  `).all(today, limit);
+  `).all(limit);
   deadlines.push(...solDeadlines);
 
-  // Sort all by date and limit
+  // Sort all by date
   deadlines.sort((a, b) => a.deadline_date.localeCompare(b.deadline_date));
 
-  // Calculate days until due
+  // Calculate days until due and mark overdue
   const todayDate = new Date(today);
   for (const deadline of deadlines) {
     const deadlineDate = new Date(deadline.deadline_date);
     const diffDays = Math.ceil((deadlineDate - todayDate) / (1000 * 60 * 60 * 24));
     deadline.days_until = diffDays;
+    deadline.is_overdue = diffDays < 0;
   }
 
   res.json({ deadlines: deadlines.slice(0, limit) });

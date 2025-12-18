@@ -155,33 +155,57 @@ function AdminDashboard({ user }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {deadlines.map((deadline, idx) => (
-                <Link
-                  key={idx}
-                  to={`/cases/${deadline.case_id}`}
-                  style={{
-                    display: 'block',
-                    padding: '12px',
-                    background: deadline.days_until <= 3 ? 'rgba(239, 68, 68, 0.05)' : 'var(--gray-50)',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    borderLeft: `3px solid ${deadline.days_until <= 3 ? 'var(--danger)' : 'var(--primary)'}`
-                  }}
-                >
-                  <div style={{ fontWeight: 500, fontSize: '14px' }}>{deadline.deadline_type}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--gray-600)' }}>
-                    {deadline.case_number} • {deadline.defendant_name}
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: deadline.days_until <= 3 ? 'var(--danger)' : 'var(--gray-500)',
-                    marginTop: '4px'
-                  }}>
-                    {formatDate(deadline.deadline_date)} ({deadline.days_until === 0 ? 'Today' : deadline.days_until === 1 ? 'Tomorrow' : `${deadline.days_until} days`})
-                  </div>
-                </Link>
-              ))}
+              {deadlines.map((deadline, idx) => {
+                const isOverdue = deadline.is_overdue || deadline.days_until < 0
+                const isUrgent = deadline.days_until <= 3 && deadline.days_until >= 0
+                const daysText = isOverdue
+                  ? `${Math.abs(deadline.days_until)} days overdue`
+                  : deadline.days_until === 0
+                    ? 'Due Today'
+                    : deadline.days_until === 1
+                      ? 'Due Tomorrow'
+                      : `${deadline.days_until} days`
+                return (
+                  <Link
+                    key={idx}
+                    to={`/cases/${deadline.case_id}`}
+                    style={{
+                      display: 'block',
+                      padding: '12px',
+                      background: isOverdue ? 'rgba(239, 68, 68, 0.1)' : isUrgent ? 'rgba(239, 68, 68, 0.05)' : 'var(--gray-50)',
+                      borderRadius: '8px',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      borderLeft: `3px solid ${isOverdue || isUrgent ? 'var(--danger)' : 'var(--primary)'}`
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ fontWeight: 500, fontSize: '14px' }}>{deadline.deadline_type}</div>
+                      {isOverdue && (
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: 'var(--danger)',
+                          color: 'white'
+                        }}>OVERDUE</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--gray-600)' }}>
+                      {deadline.case_number} • {deadline.defendant_name}
+                    </div>
+                    <div style={{
+                      fontSize: '12px',
+                      color: isOverdue || isUrgent ? 'var(--danger)' : 'var(--gray-500)',
+                      marginTop: '4px',
+                      fontWeight: isOverdue ? 500 : 400
+                    }}>
+                      {formatDate(deadline.deadline_date)} ({daysText})
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
