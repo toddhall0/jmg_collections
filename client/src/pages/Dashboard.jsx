@@ -1,15 +1,32 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../utils/api'
-import { formatCurrency, formatDate } from '../utils/format'
+import { formatCurrency, formatDate, formatDateTime } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null)
-  const [recentCases, setRecentCases] = useState([])
-  const [myTasks, setMyTasks] = useState([])
+  const { user, isAdmin, isLocalCounsel, isClient } = useAuth()
+
+  // For admin/internal counsel
+  if (isAdmin) {
+    return <AdminDashboard user={user} />
+  }
+
+  // For client users
+  if (isClient) {
+    return <ClientDashboard user={user} />
+  }
+
+  // For local counsel
+  return <LocalCounselDashboard user={user} />
+}
+
+function AdminDashboard({ user }) {
+  const [summary, setSummary] = useState(null)
+  const [pipeline, setPipeline] = useState(null)
+  const [activities, setActivities] = useState([])
+  const [deadlines, setDeadlines] = useState([])
   const [loading, setLoading] = useState(true)
-  const { user, isAdmin, isLocalCounsel } = useAuth()
 
   useEffect(() => {
     loadData()
@@ -17,13 +34,341 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [statsData, casesData, tasksData] = await Promise.all([
-        api.get('/cases/stats'),
-        api.get('/cases?sort_by=date_opened&sort_order=desc'),
+      const [summaryData, pipelineData, activityData, deadlineData] = await Promise.all([
+        api.get('/dashboard/admin-summary'),
+        api.get('/dashboard/pipeline-summary'),
+        api.get('/dashboard/activity-feed?limit=20'),
+        api.get('/dashboard/upcoming-deadlines?limit=10')
+      ])
+      setSummary(summaryData)
+      setPipeline(pipelineData)
+      setActivities(activityData.activities)
+      setDeadlines(deadlineData.deadlines)
+    } catch (error) {
+      console.error('Error loading dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="loading">Loading dashboard...</div>
+  }
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'note': return '📝'
+      case 'communication': return '💬'
+      case 'document': return '📄'
+      case 'task': return '✅'
+      default: return '•'
+    }
+  }
+
+  const maxBarValue = pipeline?.stages
+    ? Math.max(...pipeline.stages.map(s => pipeline.pipeline[s]?.case_count || 0), 1)
+    : 1
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h1>Admin Dashboard</h1>
+          <p style={{ color: 'var(--gray-500)', marginTop: '4px' }}>
+            Welcome back, {user?.full_name}
+          </p>
+        </div>
+        <Link to="/cases/new" className="btn btn-primary">+ New Case</Link>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <div className="stat-card">
+          <div className="stat-label">Active Cases</div>
+          <div className="stat-value">{summary?.active_cases || 0}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Amount Outstanding</div>
+          <div className="stat-value currency">{formatCurrency(summary?.amount_outstanding)}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Recovered This Year</div>
+          <div className="stat-value currency" style={{ color: 'var(--success)' }}>
+            {formatCurrency(summary?.recovered_this_year)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Recovery Rate</div>
+          <div className="stat-value">{summary?.recovery_rate || 0}%</div>
+        </div>
+        <div className="stat-card" style={summary?.cases_needing_attention > 0 ? { borderColor: 'var(--danger)' } : {}}>
+          <div className="stat-label">Needs Attention</div>
+          <div className="stat-value" style={summary?.cases_needing_attention > 0 ? { color: 'var(--danger)' } : {}}>
+            {summary?.cases_needing_attention || 0}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginTop: '24px' }}>
+        {/* Pipeline Summary */}
+        <div className="card">
+          <div className="card-header">
+            <h2>Pipeline Summary</h2>
+            <Link to="/pipeline" className="btn btn-secondary btn-sm">View Pipeline</Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {pipeline?.stages?.filter(stage => stage !== 'Closed - Resolved').map(stage => {
+              const data = pipeline.pipeline[stage] || { case_count: 0, total_amount: 0 }
+              const barWidth = (data.case_count / maxBarValue) * 100
+              return (
+                <div key={stage}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--gray-700)' }}>{stage}</span>
+                    <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
+                      {data.case_count} cases • {formatCurrency(data.total_amount)}
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', background: 'var(--gray-100)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${barWidth}%`,
+                      background: 'var(--primary)',
+                      borderRadius: '4px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Upcoming Deadlines */}
+        <div className="card">
+          <div className="card-header">
+            <h2>Upcoming Deadlines</h2>
+            <Link to="/deadlines" className="btn btn-secondary btn-sm">View All</Link>
+          </div>
+          {deadlines.length === 0 ? (
+            <div style={{ color: 'var(--gray-500)', fontSize: '14px', textAlign: 'center', padding: '20px' }}>
+              No upcoming deadlines
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {deadlines.map((deadline, idx) => (
+                <Link
+                  key={idx}
+                  to={`/cases/${deadline.case_id}`}
+                  style={{
+                    display: 'block',
+                    padding: '12px',
+                    background: deadline.days_until <= 3 ? 'rgba(239, 68, 68, 0.05)' : 'var(--gray-50)',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    borderLeft: `3px solid ${deadline.days_until <= 3 ? 'var(--danger)' : 'var(--primary)'}`
+                  }}
+                >
+                  <div style={{ fontWeight: 500, fontSize: '14px' }}>{deadline.deadline_type}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--gray-600)' }}>
+                    {deadline.case_number} • {deadline.defendant_name}
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: deadline.days_until <= 3 ? 'var(--danger)' : 'var(--gray-500)',
+                    marginTop: '4px'
+                  }}>
+                    {formatDate(deadline.deadline_date)} ({deadline.days_until === 0 ? 'Today' : deadline.days_until === 1 ? 'Tomorrow' : `${deadline.days_until} days`})
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <div className="card-header">
+          <h2>Recent Activity</h2>
+        </div>
+        {activities.length === 0 ? (
+          <div style={{ color: 'var(--gray-500)', fontSize: '14px', textAlign: 'center', padding: '20px' }}>
+            No recent activity
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {activities.map((activity, idx) => (
+              <Link
+                key={idx}
+                to={`/cases/${activity.case_id}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  padding: '12px 0',
+                  borderBottom: idx < activities.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                  textDecoration: 'none',
+                  color: 'inherit'
+                }}
+              >
+                <span style={{ fontSize: '18px' }}>{getActivityIcon(activity.activity_type)}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, fontSize: '14px' }}>
+                    {activity.action}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--gray-600)' }}>
+                    {activity.case_number} • {activity.summary?.substring(0, 60)}{activity.summary?.length > 60 ? '...' : ''}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+                    {activity.user_name} • {formatDateTime(activity.timestamp)}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ClientDashboard({ user }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const result = await api.get('/dashboard/client-summary')
+      setData(result)
+    } catch (error) {
+      console.error('Error loading dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="loading">Loading dashboard...</div>
+  }
+
+  const getStatusBadgeClass = (status) => {
+    const classes = {
+      'Open': 'badge-open',
+      'Settled': 'badge-settled',
+      'Judgment Obtained': 'badge-judgment',
+      'Dismissed': 'badge-dismissed',
+      'Abandoned': 'badge-abandoned'
+    }
+    return classes[status] || 'badge-stage'
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p style={{ color: 'var(--gray-500)', marginTop: '4px' }}>
+            Welcome back, {user?.full_name}
+          </p>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Active Cases</div>
+          <div className="stat-value">{data?.summary?.active_cases || 0}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Total Outstanding</div>
+          <div className="stat-value currency">{formatCurrency(data?.summary?.total_outstanding)}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Total Recovered</div>
+          <div className="stat-value currency" style={{ color: 'var(--success)' }}>
+            {formatCurrency(data?.summary?.total_recovered)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Recovery Rate</div>
+          <div className="stat-value">{data?.summary?.recovery_rate || 0}%</div>
+        </div>
+      </div>
+
+      {/* All Cases */}
+      <div className="card">
+        <div className="card-header">
+          <h2>Your Cases</h2>
+        </div>
+        {data?.cases?.length === 0 ? (
+          <div className="empty-state">
+            <h3>No cases found</h3>
+            <p>You don't have any cases yet.</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Case Number</th>
+                  <th>Name</th>
+                  <th>Defendant</th>
+                  <th>Amount Claimed</th>
+                  <th>Amount Recovered</th>
+                  <th>Stage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.cases?.map((caseItem) => (
+                  <tr key={caseItem.id}>
+                    <td>
+                      <Link to={`/cases/${caseItem.id}`} className="table-link">
+                        {caseItem.case_number}
+                      </Link>
+                    </td>
+                    <td>{caseItem.case_name}</td>
+                    <td>{caseItem.defendant_name}</td>
+                    <td>{formatCurrency(caseItem.amount_claimed)}</td>
+                    <td style={{ color: 'var(--success)' }}>{formatCurrency(caseItem.amount_recovered)}</td>
+                    <td><span className="badge badge-stage">{caseItem.current_stage}</span></td>
+                    <td>
+                      <span className={`badge ${getStatusBadgeClass(caseItem.resolution_status)}`}>
+                        {caseItem.resolution_status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LocalCounselDashboard({ user }) {
+  const [data, setData] = useState(null)
+  const [myTasks, setMyTasks] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      const [summaryData, tasksData] = await Promise.all([
+        api.get('/dashboard/client-summary'),
         api.get('/tasks/my-tasks')
       ])
-      setStats(statsData)
-      setRecentCases(casesData.cases.slice(0, 5))
+      setData(summaryData)
       setMyTasks(tasksData.tasks || [])
     } catch (error) {
       console.error('Error loading dashboard:', error)
@@ -74,92 +419,31 @@ export default function Dashboard() {
             Welcome back, {user?.full_name}
           </p>
         </div>
-        {isAdmin && (
-          <Link to="/cases/new" className="btn btn-primary">
-            + New Case
-          </Link>
-        )}
       </div>
 
+      {/* Summary Cards */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Total Cases</div>
-          <div className="stat-value">{stats?.total_cases || 0}</div>
+          <div className="stat-label">My Cases</div>
+          <div className="stat-value">{data?.summary?.active_cases || 0}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Open Cases</div>
-          <div className="stat-value">{stats?.open_cases || 0}</div>
+          <div className="stat-label">Total Outstanding</div>
+          <div className="stat-value currency">{formatCurrency(data?.summary?.total_outstanding)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Total Claimed</div>
-          <div className="stat-value currency">{formatCurrency(stats?.total_claimed)}</div>
+          <div className="stat-label">Pending Tasks</div>
+          <div className="stat-value">{myTasks.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Total Recovered</div>
-          <div className="stat-value currency">{formatCurrency(stats?.total_recovered)}</div>
+          <div className="stat-label">Overdue Tasks</div>
+          <div className="stat-value" style={{ color: myTasks.filter(t => t.is_overdue).length > 0 ? 'var(--danger)' : 'inherit' }}>
+            {myTasks.filter(t => t.is_overdue).length}
+          </div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h2>
-            {isLocalCounsel ? 'My Assigned Cases' : 'Recent Cases'}
-          </h2>
-          <Link to="/cases" className="btn btn-secondary btn-sm">
-            View All
-          </Link>
-        </div>
-
-        {recentCases.length === 0 ? (
-          <div className="empty-state">
-            <h3>No cases found</h3>
-            <p>
-              {isLocalCounsel
-                ? 'You have no cases assigned to you yet.'
-                : 'Get started by creating your first case.'}
-            </p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Case Number</th>
-                  <th>Defendant</th>
-                  <th>Amount Claimed</th>
-                  <th>Stage</th>
-                  <th>Status</th>
-                  <th>Date Opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentCases.map((caseItem) => (
-                  <tr key={caseItem.id}>
-                    <td>
-                      <Link to={`/cases/${caseItem.id}`} className="table-link">
-                        {caseItem.case_number}
-                      </Link>
-                    </td>
-                    <td>{caseItem.defendant_name}</td>
-                    <td>{formatCurrency(caseItem.amount_claimed)}</td>
-                    <td>
-                      <span className="badge badge-stage">{caseItem.current_stage}</span>
-                    </td>
-                    <td>
-                      <span className={`badge ${getStatusBadgeClass(caseItem.resolution_status)}`}>
-                        {caseItem.resolution_status}
-                      </span>
-                    </td>
-                    <td>{formatDate(caseItem.date_opened)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* My Tasks Section */}
+      {/* My Tasks */}
       {myTasks.length > 0 && (
         <div className="card">
           <div className="card-header">
@@ -200,9 +484,7 @@ export default function Dashboard() {
                         {task.priority}
                       </span>
                     </td>
-                    <td>
-                      <span className="badge badge-stage">{task.status}</span>
-                    </td>
+                    <td><span className="badge badge-stage">{task.status}</span></td>
                     <td>
                       <select
                         value={task.status}
@@ -222,21 +504,52 @@ export default function Dashboard() {
         </div>
       )}
 
-      {stats?.by_stage?.length > 0 && !isLocalCounsel && (
-        <div className="card">
-          <div className="card-header">
-            <h2>Cases by Stage</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-            {stats.by_stage.map((item) => (
-              <div key={item.current_stage} style={{ padding: '12px', background: 'var(--gray-50)', borderRadius: '4px' }}>
-                <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{item.current_stage}</div>
-                <div style={{ fontSize: '24px', fontWeight: '600' }}>{item.count}</div>
-              </div>
-            ))}
-          </div>
+      {/* My Cases */}
+      <div className="card">
+        <div className="card-header">
+          <h2>My Assigned Cases</h2>
+          <Link to="/cases" className="btn btn-secondary btn-sm">View All</Link>
         </div>
-      )}
+        {data?.cases?.length === 0 ? (
+          <div className="empty-state">
+            <h3>No cases assigned</h3>
+            <p>You have no cases assigned to you yet.</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Case Number</th>
+                  <th>Defendant</th>
+                  <th>Amount Claimed</th>
+                  <th>Stage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.cases?.map((caseItem) => (
+                  <tr key={caseItem.id}>
+                    <td>
+                      <Link to={`/cases/${caseItem.id}`} className="table-link">
+                        {caseItem.case_number}
+                      </Link>
+                    </td>
+                    <td>{caseItem.defendant_name}</td>
+                    <td>{formatCurrency(caseItem.amount_claimed)}</td>
+                    <td><span className="badge badge-stage">{caseItem.current_stage}</span></td>
+                    <td>
+                      <span className={`badge ${getStatusBadgeClass(caseItem.resolution_status)}`}>
+                        {caseItem.resolution_status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

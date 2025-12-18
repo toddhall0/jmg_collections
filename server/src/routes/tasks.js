@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, canAccessCase } from '../middleware/auth.js';
+import { notifyTaskAssigned } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -142,6 +143,18 @@ router.post('/case/:caseId', authenticateToken, canAccessCase, (req, res) => {
       JOIN users creator ON t.created_by = creator.id
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
+
+    // Send notification to assignee (if not self-assigning)
+    if (assigned_to !== req.user.id) {
+      const caseInfo = db.prepare('SELECT case_number FROM cases WHERE id = ?').get(caseId);
+      notifyTaskAssigned(
+        task.id,
+        assigned_to,
+        req.user.full_name,
+        caseInfo.case_number,
+        description.trim()
+      );
+    }
 
     res.status(201).json({ task, message: 'Task created successfully' });
   } catch (error) {

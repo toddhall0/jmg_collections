@@ -14,6 +14,11 @@ import tasksRoutes from './routes/tasks.js';
 import localCounselRoutes from './routes/localCounsel.js';
 import shareLinksRoutes from './routes/shareLinks.js';
 import inviteRoutes from './routes/invites.js';
+import dashboardRoutes from './routes/dashboard.js';
+import reportsRoutes from './routes/reports.js';
+import templatesRoutes from './routes/templates.js';
+import notificationsRoutes from './routes/notifications.js';
+import auditRoutes from './routes/audit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -50,6 +55,11 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/local-counsel', localCounselRoutes);
 app.use('/api/share-links', shareLinksRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/templates', templatesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

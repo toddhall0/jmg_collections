@@ -10,6 +10,7 @@ import CaseTasks from '../components/CaseTasks'
 import LocalCounselAssignment from '../components/LocalCounselAssignment'
 import AssignedCounsel from '../components/AssignedCounsel'
 import ShareLink from '../components/ShareLink'
+import GenerateDocument from '../components/GenerateDocument'
 
 export default function CaseDetail() {
   const { id } = useParams()
@@ -395,6 +396,9 @@ export default function CaseDetail() {
               </div>
             </div>
           </div>
+
+          {/* Generate Documents */}
+          <GenerateDocument caseId={id} caseData={caseData} onGenerated={loadCase} />
 
           {/* Assigned Counsel (Internal) */}
           <AssignedCounsel caseId={id} caseData={caseData} onUpdate={loadCase} />

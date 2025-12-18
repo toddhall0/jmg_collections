@@ -12,6 +12,10 @@ import Deadlines from './pages/Deadlines'
 import LocalCounselDirectory from './pages/LocalCounselDirectory'
 import SharedCaseView from './pages/SharedCaseView'
 import Register from './pages/Register'
+import Reports from './pages/Reports'
+import Templates from './pages/Templates'
+import NotificationSettings from './pages/NotificationSettings'
+import AuditLog from './pages/AuditLog'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -70,6 +74,10 @@ export default function App() {
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="deadlines" element={<Deadlines />} />
         <Route path="local-counsel" element={<AdminRoute><LocalCounselDirectory /></AdminRoute>} />
+        <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="templates" element={<AdminRoute><Templates /></AdminRoute>} />
+        <Route path="settings/notifications" element={<NotificationSettings />} />
+        <Route path="audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
         <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

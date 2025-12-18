@@ -193,6 +193,68 @@ function initializeDatabase() {
     )
   `);
 
+  // Document templates table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS document_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      template_type TEXT NOT NULL CHECK(template_type IN ('Initial Notice', 'Second Notice', 'Demand Letter', 'Other')),
+      content TEXT NOT NULL,
+      description TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Notifications table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      case_id INTEGER REFERENCES cases(id) ON DELETE CASCADE,
+      is_read INTEGER DEFAULT 0,
+      email_sent INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // User notification preferences table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email_task_assigned INTEGER DEFAULT 1,
+      email_task_reminder INTEGER DEFAULT 1,
+      email_task_overdue INTEGER DEFAULT 1,
+      email_stage_change INTEGER DEFAULT 1,
+      email_document_upload INTEGER DEFAULT 0,
+      email_case_assigned INTEGER DEFAULT 1,
+      email_deadline_reminder INTEGER DEFAULT 1,
+      in_app_enabled INTEGER DEFAULT 1,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Audit log table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER,
+      entity_name TEXT,
+      details TEXT,
+      ip_address TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // Add deadline tracking columns to cases table if they don't exist
   const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
   const columnNames = caseColumns.map(c => c.name);
