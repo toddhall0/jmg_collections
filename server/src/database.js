@@ -4,14 +4,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', 'data', 'collections.db');
+
+// Use DATABASE_PATH env var for persistent storage, or fall back to local data directory
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'collections.db');
 
 // Ensure data directory exists
 import fs from 'fs';
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+console.log(`Using database at: ${dbPath}`);
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
