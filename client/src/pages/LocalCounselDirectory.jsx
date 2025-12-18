@@ -23,7 +23,10 @@ export default function LocalCounselDirectory() {
     fee_arrangement_notes: '',
     performance_rating: 'Not Yet Rated',
     notes: '',
-    status: 'Active'
+    status: 'Active',
+    create_user_account: false,
+    username: '',
+    password: ''
   })
   const [saving, setSaving] = useState(false)
 
@@ -94,7 +97,10 @@ export default function LocalCounselDirectory() {
       fee_arrangement_notes: '',
       performance_rating: 'Not Yet Rated',
       notes: '',
-      status: 'Active'
+      status: 'Active',
+      create_user_account: false,
+      username: '',
+      password: ''
     })
     setShowForm(true)
   }
@@ -113,7 +119,10 @@ export default function LocalCounselDirectory() {
       fee_arrangement_notes: contact.fee_arrangement_notes || '',
       performance_rating: contact.performance_rating || 'Not Yet Rated',
       notes: contact.notes || '',
-      status: contact.status || 'Active'
+      status: contact.status || 'Active',
+      create_user_account: false,
+      username: '',
+      password: ''
     })
     setShowForm(true)
   }
@@ -123,20 +132,56 @@ export default function LocalCounselDirectory() {
     setSaving(true)
 
     try {
-      const payload = {
-        ...formData,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
-        retainer_required: formData.retainer_required ? parseFloat(formData.retainer_required) : null
+      // Validate user account fields if creating user
+      if (formData.create_user_account && !editingContact) {
+        if (!formData.username || formData.username.length < 3) {
+          alert('Username must be at least 3 characters')
+          setSaving(false)
+          return
+        }
+        if (!formData.password || formData.password.length < 6) {
+          alert('Password must be at least 6 characters')
+          setSaving(false)
+          return
+        }
       }
 
+      const payload = {
+        firm_name: formData.firm_name,
+        attorney_name: formData.attorney_name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        states_covered: formData.states_covered,
+        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
+        retainer_required: formData.retainer_required ? parseFloat(formData.retainer_required) : null,
+        fee_arrangement_notes: formData.fee_arrangement_notes,
+        performance_rating: formData.performance_rating,
+        notes: formData.notes,
+        status: formData.status
+      }
+
+      // Add user account creation fields if checkbox is checked
+      if (formData.create_user_account && !editingContact) {
+        payload.create_user_account = true
+        payload.username = formData.username
+        payload.password = formData.password
+      }
+
+      let result
       if (editingContact) {
-        await api.put(`/local-counsel/${editingContact.id}`, payload)
+        result = await api.put(`/local-counsel/${editingContact.id}`, payload)
       } else {
-        await api.post('/local-counsel', payload)
+        result = await api.post('/local-counsel', payload)
       }
 
       setShowForm(false)
       loadContacts()
+
+      // Show success message if user was created
+      if (result.user_created) {
+        alert(`Contact created successfully!\n\nUser account created:\nUsername: ${formData.username}\nTemporary Password: ${formData.password}\n\nPlease share these credentials with the counsel.`)
+      }
     } catch (err) {
       alert('Error: ' + err.message)
     } finally {
@@ -489,6 +534,74 @@ export default function LocalCounselDirectory() {
                     placeholder="General notes about working with this counsel..."
                   />
                 </div>
+
+                {/* User Account Creation Section - only for new contacts */}
+                {!editingContact && (
+                  <div style={{
+                    marginTop: '20px',
+                    padding: '16px',
+                    background: 'var(--gray-50)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--gray-200)'
+                  }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      marginBottom: formData.create_user_account ? '16px' : 0
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.create_user_account}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          create_user_account: e.target.checked,
+                          username: e.target.checked ? prev.email.split('@')[0] : '',
+                          password: ''
+                        }))}
+                      />
+                      Create user account for system access
+                    </label>
+
+                    {formData.create_user_account && (
+                      <div>
+                        <p style={{ fontSize: '13px', color: 'var(--gray-600)', marginBottom: '12px' }}>
+                          This will create a login account so the counsel can access assigned cases in the system.
+                        </p>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Username *</label>
+                            <input
+                              type="text"
+                              name="username"
+                              value={formData.username}
+                              onChange={handleFormChange}
+                              placeholder="Username for login"
+                              minLength={3}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Temporary Password *</label>
+                            <input
+                              type="text"
+                              name="password"
+                              value={formData.password}
+                              onChange={handleFormChange}
+                              placeholder="Initial password (min 6 chars)"
+                              minLength={6}
+                            />
+                          </div>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '8px' }}>
+                          The counsel will use their email ({formData.email || 'entered above'}) and this password to log in.
+                          They should change their password after first login.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>

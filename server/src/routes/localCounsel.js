@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { db } from '../database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 
@@ -132,7 +133,10 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
     fee_arrangement_notes,
     performance_rating,
     notes,
-    status
+    status,
+    create_user_account,
+    username,
+    password
   } = req.body;
 
   // Validation
@@ -165,7 +169,36 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
     return res.status(400).json({ error: 'Invalid status' });
   }
 
+  // Validate user account fields if creating user
+  if (create_user_account) {
+    if (!username || username.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    // Check if username or email already exists
+    const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username or email already exists in the system' });
+    }
+  }
+
   try {
+    let createdUserId = null;
+    let userCreated = false;
+
+    // Create user account if requested
+    if (create_user_account) {
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      const userResult = db.prepare(`
+        INSERT INTO users (username, email, password, full_name, role, active)
+        VALUES (?, ?, ?, ?, 'local_counsel', 1)
+      `).run(username, email, hashedPassword, attorney_name);
+      createdUserId = userResult.lastInsertRowid;
+      userCreated = true;
+    }
+
     const result = db.prepare(`
       INSERT INTO local_counsel_contacts (
         firm_name, attorney_name, email, phone, address,
@@ -195,7 +228,12 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
       contact.states_covered = JSON.parse(contact.states_covered);
     }
 
-    res.status(201).json({ contact, message: 'Local counsel contact created successfully' });
+    res.status(201).json({
+      contact,
+      message: 'Local counsel contact created successfully',
+      user_created: userCreated,
+      user_id: createdUserId
+    });
   } catch (error) {
     console.error('Error creating local counsel contact:', error);
     res.status(500).json({ error: 'Failed to create local counsel contact' });
