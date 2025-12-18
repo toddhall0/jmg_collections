@@ -85,5 +85,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Collections Manager API running on port ${PORT}`);
   console.log(`Server started at: ${new Date().toISOString()}`);
-  console.log(`Build: v1.0.1`);
+  console.log(`Build: v1.0.2`);
 });
