@@ -13,6 +13,7 @@ import documentsRoutes from './routes/documents.js';
 import tasksRoutes from './routes/tasks.js';
 import localCounselRoutes from './routes/localCounsel.js';
 import shareLinksRoutes from './routes/shareLinks.js';
+import inviteRoutes from './routes/invites.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/local-counsel', localCounselRoutes);
 app.use('/api/share-links', shareLinksRoutes);
+app.use('/api/invites', inviteRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

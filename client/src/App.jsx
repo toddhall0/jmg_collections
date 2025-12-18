@@ -11,6 +11,7 @@ import Pipeline from './pages/Pipeline'
 import Deadlines from './pages/Deadlines'
 import LocalCounselDirectory from './pages/LocalCounselDirectory'
 import SharedCaseView from './pages/SharedCaseView'
+import Register from './pages/Register'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -48,6 +49,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Public registration with invite token */}
+      <Route path="/register/:token" element={<Register />} />
       {/* Public shared case view - no authentication */}
       <Route path="/shared/case/:token" element={<SharedCaseView />} />
       <Route

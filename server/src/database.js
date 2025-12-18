@@ -178,6 +178,21 @@ function initializeDatabase() {
     )
   `);
 
+  // User invites table (for invite-based registration)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_invites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('admin', 'internal_counsel', 'client', 'local_counsel')),
+      invite_token TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL,
+      invited_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      used_at TEXT,
+      used_by_user_id INTEGER REFERENCES users(id)
+    )
+  `);
+
   // Add deadline tracking columns to cases table if they don't exist
   const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
   const columnNames = caseColumns.map(c => c.name);
