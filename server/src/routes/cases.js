@@ -30,12 +30,15 @@ const US_STATES = [
 
 // Get all cases (with role-based filtering)
 router.get('/', authenticateToken, (req, res) => {
-  const { stage, resolution_status, sort_by, sort_order, search } = req.query;
+  const { stage, resolution_status, category_id, sort_by, sort_order, search } = req.query;
 
   let query = `
     SELECT c.*,
+           cc.name as category_name,
+           cc.code as category_code,
            GROUP_CONCAT(u.full_name) as assigned_counsel
     FROM cases c
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
     LEFT JOIN case_assignments ca ON c.id = ca.case_id
     LEFT JOIN users u ON ca.user_id = u.id
   `;
@@ -72,6 +75,12 @@ router.get('/', authenticateToken, (req, res) => {
   if (resolution_status) {
     conditions.push('c.resolution_status = ?');
     values.push(resolution_status);
+  }
+
+  // Filter by category
+  if (category_id) {
+    conditions.push('c.category_id = ?');
+    values.push(category_id);
   }
 
   // Search
@@ -150,9 +159,12 @@ router.get('/pipeline', authenticateToken, (req, res) => {
 
   let caseQuery = `
     SELECT c.*,
+           cc.name as category_name,
+           cc.code as category_code,
            GROUP_CONCAT(DISTINCT u.full_name) as assigned_counsel,
            (SELECT COUNT(*) FROM tasks t WHERE t.case_id = c.id AND t.due_date < ? AND t.status != 'Complete') as overdue_tasks
     FROM cases c
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
     LEFT JOIN case_assignments ca ON c.id = ca.case_id
     LEFT JOIN users u ON ca.user_id = u.id
   `;
@@ -278,6 +290,9 @@ router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
   const caseData = db.prepare(`
     SELECT c.*,
            creator.full_name as created_by_name,
+           cc.name as category_name,
+           cc.code as category_code,
+           cc.description as category_description,
            lc.id as local_counsel_id,
            lc.firm_name as local_counsel_firm,
            lc.attorney_name as local_counsel_attorney,
@@ -291,6 +306,7 @@ router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
            ac.email as assigned_counsel_email
     FROM cases c
     LEFT JOIN users creator ON c.created_by = creator.id
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
     LEFT JOIN local_counsel_contacts lc ON c.assigned_local_counsel_id = lc.id
     LEFT JOIN users lcu ON c.local_counsel_user_id = lcu.id
     LEFT JOIN users ac ON c.assigned_counsel_id = ac.id
@@ -317,6 +333,7 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
   const {
     case_name,
     client_matter_reference,
+    category_id,
     date_opened,
     defendant_name,
     defendant_entity_type,
@@ -325,6 +342,11 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
     defendant_phone,
     defendant_mailing_address,
     defendant_state,
+    defendant_attorney_name,
+    defendant_attorney_firm,
+    defendant_attorney_address,
+    defendant_attorney_email,
+    defendant_attorney_phone,
     amount_claimed,
     date_claim_arose,
     statute_of_limitations_date,
@@ -378,20 +400,23 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
   try {
     const result = db.prepare(`
       INSERT INTO cases (
-        case_number, case_name, client_matter_reference, date_opened,
+        case_number, case_name, client_matter_reference, category_id, date_opened,
         defendant_name, defendant_entity_type, defendant_contact_name,
         defendant_email, defendant_phone, defendant_mailing_address,
-        defendant_state, amount_claimed, date_claim_arose,
+        defendant_state, defendant_attorney_name, defendant_attorney_firm,
+        defendant_attorney_address, defendant_attorney_email, defendant_attorney_phone,
+        amount_claimed, date_claim_arose,
         statute_of_limitations_date, claim_description, current_stage,
         resolution_status, created_by,
         initial_notice_sent_date, initial_notice_response_deadline,
         second_notice_sent_date, second_notice_response_deadline,
         stage_changed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(
       case_number,
       case_name,
       client_matter_reference || null,
+      category_id || null,
       date_opened || new Date().toISOString().split('T')[0],
       defendant_name,
       defendant_entity_type,
@@ -400,6 +425,11 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
       defendant_phone || null,
       defendant_mailing_address || null,
       defendant_state || null,
+      defendant_attorney_name || null,
+      defendant_attorney_firm || null,
+      defendant_attorney_address || null,
+      defendant_attorney_email || null,
+      defendant_attorney_phone || null,
       amount_claimed,
       date_claim_arose || null,
       statute_of_limitations_date || null,
@@ -435,10 +465,12 @@ router.put('/:id', authenticateToken, canEditCase, (req, res) => {
 
   // All updateable fields for admin
   const allFields = [
-    'case_name', 'client_matter_reference', 'date_opened',
+    'case_name', 'client_matter_reference', 'category_id', 'date_opened',
     'defendant_name', 'defendant_entity_type', 'defendant_contact_name',
     'defendant_email', 'defendant_phone', 'defendant_mailing_address',
-    'defendant_state', 'amount_claimed', 'date_claim_arose',
+    'defendant_state', 'defendant_attorney_name', 'defendant_attorney_firm',
+    'defendant_attorney_address', 'defendant_attorney_email', 'defendant_attorney_phone',
+    'amount_claimed', 'date_claim_arose',
     'statute_of_limitations_date', 'claim_description', 'current_stage',
     'resolution_status', 'amount_recovered', 'date_closed',
     'initial_notice_sent_date', 'initial_notice_response_deadline',

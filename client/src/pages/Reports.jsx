@@ -6,6 +6,7 @@ const REPORT_TYPES = [
   { id: 'case-aging', name: 'Case Aging Report', description: 'All open cases with days since opened' },
   { id: 'recovery', name: 'Recovery Report', description: 'Closed cases with recovery metrics' },
   { id: 'by-stage', name: 'Cases by Stage', description: 'Summary by current stage' },
+  { id: 'by-category', name: 'Cases by Category', description: 'Performance metrics by case category' },
   { id: 'by-jurisdiction', name: 'Cases by Jurisdiction', description: 'Summary by defendant state' }
 ]
 
@@ -105,6 +106,8 @@ export default function Reports() {
         return <RecoveryReport data={reportData} summary={summary} />
       case 'by-stage':
         return <StageReport data={reportData} summary={summary} />
+      case 'by-category':
+        return <CategoryReport data={reportData} summary={summary} />
       case 'by-jurisdiction':
         return <JurisdictionReport data={reportData} />
       default:
@@ -371,6 +374,78 @@ function JurisdictionReport({ data }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function CategoryReport({ data, summary }) {
+  return (
+    <div>
+      {summary && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '16px',
+          marginBottom: '24px',
+          padding: '16px',
+          background: 'var(--gray-50)',
+          borderRadius: '8px'
+        }}>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Total Cases</div>
+            <div style={{ fontSize: '24px', fontWeight: 600 }}>{summary.total_cases}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Categories Used</div>
+            <div style={{ fontSize: '24px', fontWeight: 600 }}>{summary.category_count}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Total Claimed</div>
+            <div style={{ fontSize: '24px', fontWeight: 600 }}>{formatCurrency(summary.total_claimed)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Recovery Rate</div>
+            <div style={{ fontSize: '24px', fontWeight: 600 }}>{summary.recovery_rate}%</div>
+          </div>
+        </div>
+      )}
+
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Code</th>
+              <th>Total Cases</th>
+              <th>Open</th>
+              <th>Closed</th>
+              <th>Total Claimed</th>
+              <th>Total Recovered</th>
+              <th>Recovery %</th>
+              <th>Avg. Claimed</th>
+              <th>Avg. Days to Resolve</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, idx) => (
+              <tr key={idx}>
+                <td style={{ fontWeight: 500 }}>{row.category_name}</td>
+                <td><span className="badge badge-secondary">{row.category_code}</span></td>
+                <td style={{ fontWeight: 600 }}>{row.case_count}</td>
+                <td>{row.open_cases}</td>
+                <td>{row.closed_cases}</td>
+                <td>{formatCurrency(row.total_claimed)}</td>
+                <td style={{ color: 'var(--success)' }}>{formatCurrency(row.total_recovered)}</td>
+                <td style={{ fontWeight: 600, color: row.recovery_percentage >= 50 ? 'var(--success)' : 'var(--warning)' }}>
+                  {row.recovery_percentage}%
+                </td>
+                <td>{formatCurrency(row.avg_amount_claimed)}</td>
+                <td>{row.avg_days_to_resolution > 0 ? Math.round(row.avg_days_to_resolution) : '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

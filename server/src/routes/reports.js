@@ -188,4 +188,63 @@ router.get('/by-jurisdiction', authenticateToken, requireRole('admin', 'internal
   res.json({ report: jurisdictions });
 });
 
+// Cases by Category Report
+router.get('/by-category', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
+  const { start_date, end_date } = req.query;
+
+  let conditions = "WHERE 1=1";
+  const values = [];
+
+  if (start_date) {
+    conditions += ' AND c.date_opened >= ?';
+    values.push(start_date);
+  }
+  if (end_date) {
+    conditions += ' AND c.date_opened <= ?';
+    values.push(end_date);
+  }
+
+  const categories = db.prepare(`
+    SELECT
+      COALESCE(cc.name, 'Uncategorized') as category_name,
+      COALESCE(cc.code, '-') as category_code,
+      COUNT(*) as case_count,
+      SUM(CASE WHEN c.resolution_status = 'Open' THEN 1 ELSE 0 END) as open_cases,
+      SUM(CASE WHEN c.resolution_status != 'Open' THEN 1 ELSE 0 END) as closed_cases,
+      COALESCE(SUM(c.amount_claimed), 0) as total_claimed,
+      COALESCE(SUM(c.amount_recovered), 0) as total_recovered,
+      CASE WHEN SUM(c.amount_claimed) > 0 THEN
+        ROUND(SUM(c.amount_recovered) * 100.0 / SUM(c.amount_claimed), 1)
+      ELSE 0 END as recovery_percentage,
+      COALESCE(AVG(c.amount_claimed), 0) as avg_amount_claimed,
+      COALESCE(AVG(
+        CASE WHEN c.resolution_status != 'Open' AND c.date_closed IS NOT NULL
+        THEN julianday(c.date_closed) - julianday(c.date_opened)
+        ELSE NULL END
+      ), 0) as avg_days_to_resolution
+    FROM cases c
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
+    ${conditions}
+    GROUP BY cc.id, cc.name, cc.code
+    ORDER BY case_count DESC
+  `).all(...values);
+
+  // Summary stats
+  const summary = db.prepare(`
+    SELECT
+      COUNT(*) as total_cases,
+      COALESCE(SUM(amount_claimed), 0) as total_claimed,
+      COALESCE(SUM(amount_recovered), 0) as total_recovered,
+      COUNT(DISTINCT category_id) as category_count
+    FROM cases c
+    ${conditions}
+  `).get(...values);
+
+  summary.recovery_rate = summary.total_claimed > 0
+    ? (summary.total_recovered / summary.total_claimed * 100).toFixed(1)
+    : 0;
+
+  res.json({ report: categories, summary });
+});
+
 export default router;

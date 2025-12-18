@@ -125,6 +125,7 @@ Very truly yours,
 
 export default function Templates() {
   const [templates, setTemplates] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEditor, setShowEditor] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
@@ -136,12 +137,14 @@ export default function Templates() {
     template_type: 'Initial Notice',
     content: '',
     description: '',
-    is_active: true
+    is_active: true,
+    category_id: ''
   })
 
   useEffect(() => {
     loadTemplates()
     loadMergeFields()
+    loadCategories()
   }, [])
 
   const loadTemplates = async () => {
@@ -164,6 +167,15 @@ export default function Templates() {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const data = await api.get('/categories')
+      setCategories(data.categories)
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
   const handleCreate = () => {
     setEditingTemplate(null)
     setFormData({
@@ -171,7 +183,8 @@ export default function Templates() {
       template_type: 'Initial Notice',
       content: '',
       description: '',
-      is_active: true
+      is_active: true,
+      category_id: ''
     })
     setShowEditor(true)
   }
@@ -183,7 +196,8 @@ export default function Templates() {
       template_type: template.template_type,
       content: template.content,
       description: template.description || '',
-      is_active: !!template.is_active
+      is_active: !!template.is_active,
+      category_id: template.category_id?.toString() || ''
     })
     setShowEditor(true)
   }
@@ -203,10 +217,14 @@ export default function Templates() {
     e.preventDefault()
 
     try {
+      const payload = {
+        ...formData,
+        category_id: formData.category_id ? parseInt(formData.category_id) : null
+      }
       if (editingTemplate) {
-        await api.put(`/templates/${editingTemplate.id}`, formData)
+        await api.put(`/templates/${editingTemplate.id}`, payload)
       } else {
-        await api.post('/templates', formData)
+        await api.post('/templates', payload)
       }
       setShowEditor(false)
       loadTemplates()
@@ -290,14 +308,31 @@ export default function Templates() {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Description</label>
-                  <input
-                    type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Brief description of when to use this template"
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <input
+                      type="text"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Brief description of when to use this template"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Associated Category</label>
+                    <select
+                      value={formData.category_id}
+                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    >
+                      <option value="">All Categories (No Restriction)</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
+                      ))}
+                    </select>
+                    <small style={{ color: 'var(--gray-500)' }}>
+                      Optionally associate this template with a specific case category
+                    </small>
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -407,6 +442,7 @@ export default function Templates() {
                 <tr>
                   <th>Name</th>
                   <th>Type</th>
+                  <th>Category</th>
                   <th>Description</th>
                   <th>Status</th>
                   <th>Created</th>
@@ -419,6 +455,15 @@ export default function Templates() {
                     <td style={{ fontWeight: 500 }}>{template.name}</td>
                     <td>
                       <span className="badge badge-stage">{template.template_type}</span>
+                    </td>
+                    <td>
+                      {template.category_code ? (
+                        <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
+                          {template.category_code}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--gray-400)', fontSize: '12px' }}>All</span>
+                      )}
                     </td>
                     <td style={{ color: 'var(--gray-500)', fontSize: '13px' }}>
                       {template.description || '-'}

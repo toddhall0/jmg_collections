@@ -19,6 +19,8 @@ import reportsRoutes from './routes/reports.js';
 import templatesRoutes from './routes/templates.js';
 import notificationsRoutes from './routes/notifications.js';
 import auditRoutes from './routes/audit.js';
+import categoriesRoutes from './routes/categories.js';
+import searchRoutes from './routes/search.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -60,6 +62,8 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/templates', templatesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

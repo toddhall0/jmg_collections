@@ -16,10 +16,12 @@ export default function CaseForm() {
     resolution_statuses: [],
     states: []
   })
+  const [categories, setCategories] = useState([])
 
   const [formData, setFormData] = useState({
     case_name: '',
     client_matter_reference: '',
+    category_id: '',
     date_opened: new Date().toISOString().split('T')[0],
     defendant_name: '',
     defendant_entity_type: 'Individual',
@@ -49,10 +51,20 @@ export default function CaseForm() {
 
   useEffect(() => {
     loadOptions()
+    loadCategories()
     if (isEditing) {
       loadCase()
     }
   }, [id])
+
+  const loadCategories = async () => {
+    try {
+      const data = await api.get('/categories')
+      setCategories(data.categories)
+    } catch (err) {
+      console.error('Error loading categories:', err)
+    }
+  }
 
   const loadOptions = async () => {
     try {
@@ -70,6 +82,7 @@ export default function CaseForm() {
       setFormData({
         case_name: caseData.case_name || '',
         client_matter_reference: caseData.client_matter_reference || '',
+        category_id: caseData.category_id?.toString() || '',
         date_opened: caseData.date_opened || '',
         defendant_name: caseData.defendant_name || '',
         defendant_entity_type: caseData.defendant_entity_type || 'Individual',
@@ -108,6 +121,14 @@ export default function CaseForm() {
     setFormData(prev => {
       const updated = { ...prev, [name]: value }
 
+      // Auto-populate claim description when category is selected
+      if (name === 'category_id' && value) {
+        const category = categories.find(c => c.id.toString() === value)
+        if (category && category.default_claim_language && !prev.claim_description) {
+          updated.claim_description = category.default_claim_language
+        }
+      }
+
       // Auto-calculate response deadlines
       if (name === 'initial_notice_sent_date' && value) {
         const date = new Date(value)
@@ -132,6 +153,7 @@ export default function CaseForm() {
     try {
       const payload = {
         ...formData,
+        category_id: formData.category_id ? parseInt(formData.category_id) : null,
         amount_claimed: parseFloat(formData.amount_claimed) || 0,
         amount_recovered: parseFloat(formData.amount_recovered) || 0
       }
@@ -197,6 +219,25 @@ export default function CaseForm() {
 
           <div className="form-row">
             <div className="form-group">
+              <label htmlFor="category_id">Case Category</label>
+              <select
+                id="category_id"
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleChange}
+              >
+                <option value="">Select Category...</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
+                ))}
+              </select>
+              {formData.category_id && categories.find(c => c.id.toString() === formData.category_id)?.description && (
+                <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: '4px' }}>
+                  {categories.find(c => c.id.toString() === formData.category_id)?.description}
+                </small>
+              )}
+            </div>
+            <div className="form-group">
               <label htmlFor="date_opened">Date Opened</label>
               <input
                 type="date"
@@ -206,6 +247,9 @@ export default function CaseForm() {
                 onChange={handleChange}
               />
             </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label htmlFor="current_stage">Current Stage</label>
               <select
@@ -219,9 +263,6 @@ export default function CaseForm() {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
               <label htmlFor="resolution_status">Resolution Status</label>
               <select
@@ -235,6 +276,9 @@ export default function CaseForm() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label htmlFor="date_closed">Date Closed</label>
               <input
@@ -245,6 +289,7 @@ export default function CaseForm() {
                 onChange={handleChange}
               />
             </div>
+            <div className="form-group"></div>
           </div>
         </div>
 

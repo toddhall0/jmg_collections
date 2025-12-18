@@ -206,6 +206,16 @@ export default function CaseDetail() {
                   <div className="detail-value">{caseData.client_matter_reference || '-'}</div>
                 </div>
                 <div className="detail-item">
+                  <div className="detail-label">Category</div>
+                  <div className="detail-value">
+                    {caseData.category_name ? (
+                      <span className="badge badge-secondary" style={{ fontSize: '12px' }}>
+                        {caseData.category_code} - {caseData.category_name}
+                      </span>
+                    ) : '-'}
+                  </div>
+                </div>
+                <div className="detail-item">
                   <div className="detail-label">Date Opened</div>
                   <div className="detail-value">{formatDate(caseData.date_opened)}</div>
                 </div>

@@ -10,22 +10,34 @@ const router = Router();
 
 // Get all templates
 router.get('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
-  const templates = db.prepare(`
-    SELECT t.*, u.full_name as created_by_name
+  const { category_id } = req.query;
+
+  let query = `
+    SELECT t.*, u.full_name as created_by_name, cc.name as category_name, cc.code as category_code
     FROM document_templates t
     LEFT JOIN users u ON t.created_by = u.id
-    ORDER BY t.template_type, t.name
-  `).all();
+    LEFT JOIN case_categories cc ON t.category_id = cc.id
+  `;
 
+  const values = [];
+  if (category_id) {
+    query += ` WHERE t.category_id = ?`;
+    values.push(category_id);
+  }
+
+  query += ` ORDER BY t.template_type, t.name`;
+
+  const templates = db.prepare(query).all(...values);
   res.json({ templates });
 });
 
 // Get single template
 router.get('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const template = db.prepare(`
-    SELECT t.*, u.full_name as created_by_name
+    SELECT t.*, u.full_name as created_by_name, cc.name as category_name, cc.code as category_code
     FROM document_templates t
     LEFT JOIN users u ON t.created_by = u.id
+    LEFT JOIN case_categories cc ON t.category_id = cc.id
     WHERE t.id = ?
   `).get(req.params.id);
 
@@ -38,7 +50,7 @@ router.get('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), 
 
 // Create template
 router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
-  const { name, template_type, content, description, is_active } = req.body;
+  const { name, template_type, content, description, is_active, category_id } = req.body;
 
   if (!name || !template_type || !content) {
     return res.status(400).json({ error: 'Name, template type, and content are required' });
@@ -46,9 +58,9 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 
   try {
     const result = db.prepare(`
-      INSERT INTO document_templates (name, template_type, content, description, is_active, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, template_type, content, description || '', is_active !== false ? 1 : 0, req.user.id);
+      INSERT INTO document_templates (name, template_type, content, description, is_active, category_id, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, template_type, content, description || '', is_active !== false ? 1 : 0, category_id || null, req.user.id);
 
     res.status(201).json({
       message: 'Template created successfully',
@@ -62,7 +74,7 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 
 // Update template
 router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
-  const { name, template_type, content, description, is_active } = req.body;
+  const { name, template_type, content, description, is_active, category_id } = req.body;
 
   const template = db.prepare('SELECT * FROM document_templates WHERE id = ?').get(req.params.id);
   if (!template) {
@@ -72,7 +84,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
   try {
     db.prepare(`
       UPDATE document_templates
-      SET name = ?, template_type = ?, content = ?, description = ?, is_active = ?, updated_at = datetime('now')
+      SET name = ?, template_type = ?, content = ?, description = ?, is_active = ?, category_id = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       name || template.name,
@@ -80,6 +92,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
       content || template.content,
       description !== undefined ? description : template.description,
       is_active !== undefined ? (is_active ? 1 : 0) : template.is_active,
+      category_id !== undefined ? (category_id || null) : template.category_id,
       req.params.id
     );
 
@@ -126,6 +139,8 @@ router.get('/merge-fields/list', authenticateToken, requireRole('admin', 'intern
     { field: '{{date_claim_arose}}', description: 'Date the claim arose' },
     { field: '{{case_number}}', description: 'Case number' },
     { field: '{{case_name}}', description: 'Case name' },
+    { field: '{{category_name}}', description: 'Case category name' },
+    { field: '{{category_code}}', description: 'Case category code' },
     { field: '{{today_date}}', description: 'Current date' },
     { field: '{{response_deadline}}', description: 'Response deadline (30 days from today)' },
     { field: '{{statute_of_limitations_date}}', description: 'Statute of limitations date' }
@@ -145,8 +160,13 @@ router.post('/generate/:templateId/case/:caseId', authenticateToken, requireRole
     return res.status(404).json({ error: 'Template not found or inactive' });
   }
 
-  // Get case data
-  const caseData = db.prepare('SELECT * FROM cases WHERE id = ?').get(caseId);
+  // Get case data with category
+  const caseData = db.prepare(`
+    SELECT c.*, cc.name as category_name, cc.code as category_code
+    FROM cases c
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
+    WHERE c.id = ?
+  `).get(caseId);
   if (!caseData) {
     return res.status(404).json({ error: 'Case not found' });
   }
@@ -193,6 +213,8 @@ router.post('/generate/:templateId/case/:caseId', authenticateToken, requireRole
     '{{date_claim_arose}}': formatDate(caseData.date_claim_arose),
     '{{case_number}}': caseData.case_number || '',
     '{{case_name}}': caseData.case_name || '',
+    '{{category_name}}': caseData.category_name || '',
+    '{{category_code}}': caseData.category_code || '',
     '{{today_date}}': formatDate(new Date().toISOString()),
     '{{response_deadline}}': formatDate(responseDeadline.toISOString()),
     '{{statute_of_limitations_date}}': formatDate(caseData.statute_of_limitations_date)
@@ -301,8 +323,13 @@ router.post('/preview/:templateId/case/:caseId', authenticateToken, requireRole(
     return res.status(404).json({ error: 'Template not found' });
   }
 
-  // Get case data
-  const caseData = db.prepare('SELECT * FROM cases WHERE id = ?').get(caseId);
+  // Get case data with category
+  const caseData = db.prepare(`
+    SELECT c.*, cc.name as category_name, cc.code as category_code
+    FROM cases c
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
+    WHERE c.id = ?
+  `).get(caseId);
   if (!caseData) {
     return res.status(404).json({ error: 'Case not found' });
   }
@@ -344,6 +371,8 @@ router.post('/preview/:templateId/case/:caseId', authenticateToken, requireRole(
     '{{date_claim_arose}}': formatDate(caseData.date_claim_arose),
     '{{case_number}}': caseData.case_number || '',
     '{{case_name}}': caseData.case_name || '',
+    '{{category_name}}': caseData.category_name || '',
+    '{{category_code}}': caseData.category_code || '',
     '{{today_date}}': formatDate(new Date().toISOString()),
     '{{response_deadline}}': formatDate(responseDeadline.toISOString()),
     '{{statute_of_limitations_date}}': formatDate(caseData.statute_of_limitations_date)

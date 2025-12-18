@@ -255,6 +255,22 @@ function initializeDatabase() {
     )
   `);
 
+  // Case categories table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS case_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      code TEXT UNIQUE NOT NULL,
+      description TEXT,
+      default_claim_language TEXT,
+      display_order INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive')),
+      created_by INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // Add deadline tracking columns to cases table if they don't exist
   const caseColumns = db.prepare("PRAGMA table_info(cases)").all();
   const columnNames = caseColumns.map(c => c.name);
@@ -309,6 +325,63 @@ function initializeDatabase() {
   }
   if (!columnNames.includes('defendant_attorney_phone')) {
     db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_phone TEXT`);
+  }
+
+  // Add category column to cases table
+  if (!columnNames.includes('category_id')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN category_id INTEGER REFERENCES case_categories(id)`);
+  }
+
+  // Add category column to document_templates table
+  const templateColumns = db.prepare("PRAGMA table_info(document_templates)").all();
+  const templateColumnNames = templateColumns.map(c => c.name);
+  if (!templateColumnNames.includes('category_id')) {
+    db.exec(`ALTER TABLE document_templates ADD COLUMN category_id INTEGER REFERENCES case_categories(id)`);
+  }
+
+  // Pre-populate default case categories if none exist
+  const categoryCount = db.prepare('SELECT COUNT(*) as count FROM case_categories').get();
+  if (categoryCount.count === 0) {
+    const defaultCategories = [
+      {
+        name: 'Partner Violation',
+        code: 'PV',
+        description: 'Claims arising from violations of partner agreements',
+        default_claim_language: 'This claim arises from a violation of the partnership agreement between the parties. The defendant has breached their obligations under the agreement by failing to comply with the terms and conditions set forth therein.',
+        display_order: 1
+      },
+      {
+        name: 'Company Referral Violation',
+        code: 'CRV',
+        description: 'Claims arising from violations of company referral fee agreements',
+        default_claim_language: 'This claim arises from a violation of the referral fee agreement between the parties. The defendant has failed to pay the agreed-upon referral fees as required under the terms of the agreement.',
+        display_order: 2
+      },
+      {
+        name: 'Early Termination Fee',
+        code: 'ETF',
+        description: 'Claims for early termination fees under contract',
+        default_claim_language: 'This claim is for early termination fees owed pursuant to the contract between the parties. The defendant terminated the agreement prior to the end of the contract term without paying the required early termination fee.',
+        display_order: 3
+      },
+      {
+        name: 'Other Breach of Contract',
+        code: 'OBC',
+        description: 'General breach of contract claims not falling into other categories',
+        default_claim_language: 'This claim arises from a breach of contract by the defendant. The defendant has failed to perform their obligations under the agreement, causing damages to the claimant.',
+        display_order: 4
+      }
+    ];
+
+    const insertCategory = db.prepare(`
+      INSERT INTO case_categories (name, code, description, default_claim_language, display_order)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const cat of defaultCategories) {
+      insertCategory.run(cat.name, cat.code, cat.description, cat.default_claim_language, cat.display_order);
+    }
+    console.log('Default case categories created');
   }
 
   // Create default admin user if no users exist

@@ -16,6 +16,8 @@ import Reports from './pages/Reports'
 import Templates from './pages/Templates'
 import NotificationSettings from './pages/NotificationSettings'
 import AuditLog from './pages/AuditLog'
+import Categories from './pages/Categories'
+import SearchResults from './pages/SearchResults'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -76,9 +78,11 @@ export default function App() {
         <Route path="local-counsel" element={<AdminRoute><LocalCounselDirectory /></AdminRoute>} />
         <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
         <Route path="templates" element={<AdminRoute><Templates /></AdminRoute>} />
+        <Route path="categories" element={<AdminRoute><Categories /></AdminRoute>} />
         <Route path="settings/notifications" element={<NotificationSettings />} />
         <Route path="audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
         <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+        <Route path="search" element={<SearchResults />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

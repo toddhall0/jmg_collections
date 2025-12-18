@@ -26,6 +26,7 @@ function AdminDashboard({ user }) {
   const [pipeline, setPipeline] = useState(null)
   const [activities, setActivities] = useState([])
   const [deadlines, setDeadlines] = useState([])
+  const [categoryStats, setCategoryStats] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,16 +35,18 @@ function AdminDashboard({ user }) {
 
   const loadData = async () => {
     try {
-      const [summaryData, pipelineData, activityData, deadlineData] = await Promise.all([
+      const [summaryData, pipelineData, activityData, deadlineData, categoryData] = await Promise.all([
         api.get('/dashboard/admin-summary'),
         api.get('/dashboard/pipeline-summary'),
         api.get('/dashboard/activity-feed?limit=20'),
-        api.get('/dashboard/upcoming-deadlines?limit=10')
+        api.get('/dashboard/upcoming-deadlines?limit=10'),
+        api.get('/categories/stats/summary')
       ])
       setSummary(summaryData)
       setPipeline(pipelineData)
       setActivities(activityData.activities)
       setDeadlines(deadlineData.deadlines)
+      setCategoryStats(categoryData.stats || [])
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
@@ -210,6 +213,62 @@ function AdminDashboard({ user }) {
           )}
         </div>
       </div>
+
+      {/* Cases by Category */}
+      {categoryStats.length > 0 && (
+        <div className="card" style={{ marginTop: '24px' }}>
+          <div className="card-header">
+            <h2>Cases by Category</h2>
+            <Link to="/categories" className="btn btn-secondary btn-sm">Manage Categories</Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+            {categoryStats.map(stat => {
+              const recoveryRate = stat.total_claimed > 0
+                ? ((stat.total_recovered / stat.total_claimed) * 100).toFixed(1)
+                : 0
+              return (
+                <Link
+                  key={stat.id}
+                  to={`/cases?category_id=${stat.id}`}
+                  style={{
+                    background: 'var(--gray-50)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    transition: 'background 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <span className="badge badge-secondary">{stat.code}</span>
+                    <span style={{ fontWeight: 500, fontSize: '14px' }}>{stat.name}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
+                    <div>
+                      <div style={{ color: 'var(--gray-500)' }}>Total</div>
+                      <div style={{ fontWeight: 600 }}>{stat.case_count}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--gray-500)' }}>Open</div>
+                      <div style={{ fontWeight: 600 }}>{stat.open_cases}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--gray-500)' }}>Claimed</div>
+                      <div style={{ fontWeight: 600 }}>{formatCurrency(stat.total_claimed)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--gray-500)' }}>Recovery</div>
+                      <div style={{ fontWeight: 600, color: recoveryRate >= 50 ? 'var(--success)' : 'var(--warning)' }}>
+                        {recoveryRate}%
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="card" style={{ marginTop: '24px' }}>

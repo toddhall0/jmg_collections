@@ -7,10 +7,12 @@ import { useAuth } from '../context/AuthContext'
 export default function CaseList() {
   const [cases, setCases] = useState([])
   const [options, setOptions] = useState({ stages: [], resolution_statuses: [] })
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     stage: '',
     resolution_status: '',
+    category_id: '',
     search: ''
   })
   const [sort, setSort] = useState({
@@ -22,6 +24,7 @@ export default function CaseList() {
 
   useEffect(() => {
     loadOptions()
+    loadCategories()
   }, [])
 
   useEffect(() => {
@@ -37,12 +40,22 @@ export default function CaseList() {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const data = await api.get('/categories')
+      setCategories(data.categories)
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
   const loadCases = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (filters.stage) params.set('stage', filters.stage)
       if (filters.resolution_status) params.set('resolution_status', filters.resolution_status)
+      if (filters.category_id) params.set('category_id', filters.category_id)
       if (filters.search) params.set('search', filters.search)
       params.set('sort_by', sort.field)
       params.set('sort_order', sort.order)
@@ -120,10 +133,20 @@ export default function CaseList() {
             ))}
           </select>
 
-          {(filters.stage || filters.resolution_status || filters.search) && (
+          <select
+            value={filters.category_id}
+            onChange={(e) => setFilters(prev => ({ ...prev, category_id: e.target.value }))}
+          >
+            <option value="">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
+            ))}
+          </select>
+
+          {(filters.stage || filters.resolution_status || filters.category_id || filters.search) && (
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => setFilters({ stage: '', resolution_status: '', search: '' })}
+              onClick={() => setFilters({ stage: '', resolution_status: '', category_id: '', search: '' })}
             >
               Clear Filters
             </button>
@@ -160,6 +183,7 @@ export default function CaseList() {
                   >
                     Defendant<span className="sort-icon">{getSortIcon('defendant_name')}</span>
                   </th>
+                  <th>Category</th>
                   <th
                     className={`sortable ${sort.field === 'amount_claimed' ? 'sorted' : ''}`}
                     onClick={() => handleSort('amount_claimed')}
@@ -195,6 +219,13 @@ export default function CaseList() {
                       <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
                         {caseItem.defendant_entity_type}
                       </div>
+                    </td>
+                    <td>
+                      {caseItem.category_code ? (
+                        <span className="badge badge-secondary" style={{ fontSize: '11px' }}>
+                          {caseItem.category_code}
+                        </span>
+                      ) : '-'}
                     </td>
                     <td>{formatCurrency(caseItem.amount_claimed)}</td>
                     <td>

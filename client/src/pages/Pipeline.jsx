@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext'
 export default function Pipeline() {
   const [pipeline, setPipeline] = useState({})
   const [stages, setStages] = useState([])
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [loading, setLoading] = useState(true)
   const [draggingCase, setDraggingCase] = useState(null)
   const [updating, setUpdating] = useState(false)
@@ -15,6 +17,7 @@ export default function Pipeline() {
 
   useEffect(() => {
     loadPipeline()
+    loadCategories()
   }, [])
 
   const loadPipeline = async () => {
@@ -28,6 +31,36 @@ export default function Pipeline() {
       setLoading(false)
     }
   }
+
+  const loadCategories = async () => {
+    try {
+      const data = await api.get('/categories')
+      setCategories(data.categories)
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
+  // Filter pipeline data by category
+  const getFilteredPipeline = () => {
+    if (!selectedCategory) return pipeline
+
+    const filtered = {}
+    for (const stage of stages) {
+      const stageData = pipeline[stage] || { cases: [], count: 0, total_amount: 0 }
+      const filteredCases = stageData.cases.filter(
+        c => c.category_id && c.category_id.toString() === selectedCategory
+      )
+      filtered[stage] = {
+        cases: filteredCases,
+        count: filteredCases.length,
+        total_amount: filteredCases.reduce((sum, c) => sum + (c.amount_claimed || 0), 0)
+      }
+    }
+    return filtered
+  }
+
+  const filteredPipeline = getFilteredPipeline()
 
   const calculateDaysInStage = (stageChangedAt) => {
     if (!stageChangedAt) return 0
@@ -81,6 +114,26 @@ export default function Pipeline() {
     <div>
       <div className="page-header">
         <h1>Case Pipeline</h1>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{ minWidth: '180px' }}
+          >
+            <option value="">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name} ({cat.code})</option>
+            ))}
+          </select>
+          {selectedCategory && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setSelectedCategory('')}
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
       </div>
 
       {updating && (
@@ -106,7 +159,7 @@ export default function Pipeline() {
         paddingBottom: '20px'
       }}>
         {stages.map((stage) => {
-          const stageData = pipeline[stage] || { cases: [], count: 0, total_amount: 0 }
+          const stageData = filteredPipeline[stage] || { cases: [], count: 0, total_amount: 0 }
 
           return (
             <div
@@ -194,10 +247,24 @@ export default function Pipeline() {
                         <div style={{
                           fontSize: '14px',
                           color: 'var(--gray-700)',
-                          marginBottom: '8px'
+                          marginBottom: '4px'
                         }}>
                           {caseItem.defendant_name}
                         </div>
+
+                        {caseItem.category_code && (
+                          <div style={{
+                            fontSize: '10px',
+                            color: 'var(--gray-500)',
+                            background: 'var(--gray-100)',
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            display: 'inline-block',
+                            marginBottom: '8px'
+                          }}>
+                            {caseItem.category_code}
+                          </div>
+                        )}
 
                         <div style={{
                           display: 'flex',
