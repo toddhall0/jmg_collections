@@ -294,6 +294,23 @@ function initializeDatabase() {
     db.exec(`ALTER TABLE cases ADD COLUMN assigned_counsel_id INTEGER REFERENCES users(id)`);
   }
 
+  // Add defendant's attorney columns to cases table
+  if (!columnNames.includes('defendant_attorney_name')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_name TEXT`);
+  }
+  if (!columnNames.includes('defendant_attorney_firm')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_firm TEXT`);
+  }
+  if (!columnNames.includes('defendant_attorney_address')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_address TEXT`);
+  }
+  if (!columnNames.includes('defendant_attorney_email')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_email TEXT`);
+  }
+  if (!columnNames.includes('defendant_attorney_phone')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN defendant_attorney_phone TEXT`);
+  }
+
   // Create default admin user if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
   if (userCount.count === 0) {

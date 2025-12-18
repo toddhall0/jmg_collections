@@ -266,6 +266,50 @@ export default function CaseDetail() {
               )}
             </div>
 
+            {(caseData.defendant_attorney_name || caseData.defendant_attorney_firm || caseData.defendant_attorney_email || caseData.defendant_attorney_phone) && (
+              <div className="detail-section">
+                <h3>Defendant's Attorney</h3>
+                <div className="detail-grid">
+                  {caseData.defendant_attorney_name && (
+                    <div className="detail-item">
+                      <div className="detail-label">Attorney Name</div>
+                      <div className="detail-value">{caseData.defendant_attorney_name}</div>
+                    </div>
+                  )}
+                  {caseData.defendant_attorney_firm && (
+                    <div className="detail-item">
+                      <div className="detail-label">Law Firm</div>
+                      <div className="detail-value">{caseData.defendant_attorney_firm}</div>
+                    </div>
+                  )}
+                  {caseData.defendant_attorney_email && (
+                    <div className="detail-item">
+                      <div className="detail-label">Email</div>
+                      <div className="detail-value">
+                        <a href={`mailto:${caseData.defendant_attorney_email}`}>{caseData.defendant_attorney_email}</a>
+                      </div>
+                    </div>
+                  )}
+                  {caseData.defendant_attorney_phone && (
+                    <div className="detail-item">
+                      <div className="detail-label">Phone</div>
+                      <div className="detail-value">
+                        <a href={`tel:${caseData.defendant_attorney_phone}`}>{caseData.defendant_attorney_phone}</a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {caseData.defendant_attorney_address && (
+                  <div className="detail-item" style={{ marginTop: '12px' }}>
+                    <div className="detail-label">Address</div>
+                    <div className="detail-value" style={{ whiteSpace: 'pre-line' }}>
+                      {caseData.defendant_attorney_address}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="detail-section">
               <h3>Claim Details</h3>
               <div className="detail-grid">

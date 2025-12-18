@@ -28,6 +28,11 @@ export default function CaseForm() {
     defendant_phone: '',
     defendant_mailing_address: '',
     defendant_state: '',
+    defendant_attorney_name: '',
+    defendant_attorney_firm: '',
+    defendant_attorney_address: '',
+    defendant_attorney_email: '',
+    defendant_attorney_phone: '',
     amount_claimed: '',
     date_claim_arose: '',
     statute_of_limitations_date: '',
@@ -73,6 +78,11 @@ export default function CaseForm() {
         defendant_phone: caseData.defendant_phone || '',
         defendant_mailing_address: caseData.defendant_mailing_address || '',
         defendant_state: caseData.defendant_state || '',
+        defendant_attorney_name: caseData.defendant_attorney_name || '',
+        defendant_attorney_firm: caseData.defendant_attorney_firm || '',
+        defendant_attorney_address: caseData.defendant_attorney_address || '',
+        defendant_attorney_email: caseData.defendant_attorney_email || '',
+        defendant_attorney_phone: caseData.defendant_attorney_phone || '',
         amount_claimed: caseData.amount_claimed?.toString() || '',
         date_claim_arose: caseData.date_claim_arose || '',
         statute_of_limitations_date: caseData.statute_of_limitations_date || '',
@@ -325,6 +335,67 @@ export default function CaseForm() {
               id="defendant_mailing_address"
               name="defendant_mailing_address"
               value={formData.defendant_mailing_address}
+              onChange={handleChange}
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: '20px' }}>Defendant's Attorney (if known)</h3>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="defendant_attorney_name">Attorney Name</label>
+              <input
+                type="text"
+                id="defendant_attorney_name"
+                name="defendant_attorney_name"
+                value={formData.defendant_attorney_name}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="defendant_attorney_firm">Law Firm</label>
+              <input
+                type="text"
+                id="defendant_attorney_firm"
+                name="defendant_attorney_firm"
+                value={formData.defendant_attorney_firm}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="defendant_attorney_email">Attorney Email</label>
+              <input
+                type="email"
+                id="defendant_attorney_email"
+                name="defendant_attorney_email"
+                value={formData.defendant_attorney_email}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="defendant_attorney_phone">Attorney Phone</label>
+              <input
+                type="tel"
+                id="defendant_attorney_phone"
+                name="defendant_attorney_phone"
+                value={formData.defendant_attorney_phone}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="defendant_attorney_address">Attorney Address</label>
+            <textarea
+              id="defendant_attorney_address"
+              name="defendant_attorney_address"
+              value={formData.defendant_attorney_address}
               onChange={handleChange}
               rows={3}
             />
