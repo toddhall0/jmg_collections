@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import bcrypt from 'bcryptjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -209,6 +210,17 @@ function initializeDatabase() {
   }
   if (!columnNames.includes('local_counsel_user_id')) {
     db.exec(`ALTER TABLE cases ADD COLUMN local_counsel_user_id INTEGER REFERENCES users(id)`);
+  }
+
+  // Create default admin user if no users exist
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  if (userCount.count === 0) {
+    const hashedPassword = bcrypt.hashSync('admin123', 10);
+    db.prepare(`
+      INSERT INTO users (username, email, password, full_name, role, active)
+      VALUES ('admin', 'admin@example.com', ?, 'System Administrator', 'admin', 1)
+    `).run(hashedPassword);
+    console.log('Default admin user created (username: admin, password: admin123)');
   }
 
   console.log('Database initialized successfully');
