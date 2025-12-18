@@ -8,6 +8,7 @@ import CommunicationLog from '../components/CommunicationLog'
 import CaseDocuments from '../components/CaseDocuments'
 import CaseTasks from '../components/CaseTasks'
 import LocalCounselAssignment from '../components/LocalCounselAssignment'
+import AssignedCounsel from '../components/AssignedCounsel'
 import ShareLink from '../components/ShareLink'
 
 export default function CaseDetail() {
@@ -395,58 +396,10 @@ export default function CaseDetail() {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-header" style={{ marginBottom: '12px' }}>
-              <h3>Assigned Counsel</h3>
-              {isAdmin && availableCounsel.length > 0 && (
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setShowAssignModal(true)}
-                >
-                  + Assign
-                </button>
-              )}
-            </div>
+          {/* Assigned Counsel (Internal) */}
+          <AssignedCounsel caseId={id} caseData={caseData} onUpdate={loadCase} />
 
-            {assignments.length === 0 ? (
-              <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
-                No counsel assigned
-              </div>
-            ) : (
-              <div>
-                {assignments.map(assignment => (
-                  <div
-                    key={assignment.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '8px 0',
-                      borderBottom: '1px solid var(--gray-100)'
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{assignment.full_name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
-                        {assignment.email}
-                      </div>
-                    </div>
-                    {isAdmin && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ color: 'var(--danger)', padding: '4px 8px' }}
-                        onClick={() => handleRemoveAssignment(assignment.id)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Local Counsel Assignment */}
+          {/* Local Counsel Assignment (External) */}
           <LocalCounselAssignment caseId={id} caseData={caseData} onUpdate={loadCase} />
 
           {/* Share Link */}
@@ -469,44 +422,6 @@ export default function CaseDetail() {
         <CaseDocuments caseId={id} />
       </div>
 
-      {showAssignModal && (
-        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Assign Local Counsel</h2>
-              <button className="modal-close" onClick={() => setShowAssignModal(false)}>&times;</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Select Counsel</label>
-                <select
-                  value={selectedCounsel}
-                  onChange={(e) => setSelectedCounsel(e.target.value)}
-                >
-                  <option value="">Choose...</option>
-                  {availableCounsel.map(counsel => (
-                    <option key={counsel.id} value={counsel.id}>
-                      {counsel.full_name} ({counsel.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleAssign}
-                disabled={!selectedCounsel}
-              >
-                Assign
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

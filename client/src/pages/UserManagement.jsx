@@ -120,6 +120,7 @@ export default function UserManagement() {
   const getRoleBadgeClass = (role) => {
     const classes = {
       admin: 'badge-judgment',
+      internal_counsel: 'badge-info',
       client: 'badge-open',
       local_counsel: 'badge-settled'
     }
@@ -278,6 +279,7 @@ export default function UserManagement() {
                       required
                     >
                       <option value="admin">Admin</option>
+                      <option value="internal_counsel">Internal Counsel</option>
                       <option value="client">Client</option>
                       <option value="local_counsel">Local Counsel</option>
                     </select>

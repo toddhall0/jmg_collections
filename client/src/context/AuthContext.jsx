@@ -42,7 +42,8 @@ export function AuthProvider({ children }) {
     login,
     logout,
     loading,
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === 'admin' || user?.role === 'internal_counsel',
+    isInternalCounsel: user?.role === 'internal_counsel',
     isClient: user?.role === 'client',
     isLocalCounsel: user?.role === 'local_counsel'
   }

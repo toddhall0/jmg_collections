@@ -16,10 +16,21 @@ router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Get local counsel users (for case assignment)
-router.get('/local-counsel', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/local-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const users = db.prepare(`
     SELECT id, username, email, full_name
     FROM users WHERE role = 'local_counsel' AND active = 1
+    ORDER BY full_name
+  `).all();
+
+  res.json({ users });
+});
+
+// Get internal counsel users (for case assignment)
+router.get('/internal-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
+  const users = db.prepare(`
+    SELECT id, username, email, full_name
+    FROM users WHERE role IN ('admin', 'internal_counsel') AND active = 1
     ORDER BY full_name
   `).all();
 
@@ -48,7 +59,7 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  if (!['admin', 'client', 'local_counsel'].includes(role)) {
+  if (!['admin', 'internal_counsel', 'client', 'local_counsel'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
 

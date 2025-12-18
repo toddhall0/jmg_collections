@@ -212,6 +212,11 @@ function initializeDatabase() {
     db.exec(`ALTER TABLE cases ADD COLUMN local_counsel_user_id INTEGER REFERENCES users(id)`);
   }
 
+  // Add assigned (internal) counsel column to cases table
+  if (!columnNames.includes('assigned_counsel_id')) {
+    db.exec(`ALTER TABLE cases ADD COLUMN assigned_counsel_id INTEGER REFERENCES users(id)`);
+  }
+
   // Create default admin user if no users exist
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
   if (userCount.count === 0) {

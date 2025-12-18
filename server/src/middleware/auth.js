@@ -56,6 +56,11 @@ export function requireRole(...roles) {
   };
 }
 
+// Helper to check if user has admin-level access
+export function hasAdminAccess(user) {
+  return user.role === 'admin' || user.role === 'internal_counsel';
+}
+
 // Check if user can access a specific case
 export function canAccessCase(req, res, next) {
   const caseId = req.params.id || req.params.caseId;
@@ -64,8 +69,8 @@ export function canAccessCase(req, res, next) {
     return next();
   }
 
-  // Admin and Client can access all cases
-  if (req.user.role === 'admin' || req.user.role === 'client') {
+  // Admin, internal counsel, and client can access all cases
+  if (hasAdminAccess(req.user) || req.user.role === 'client') {
     return next();
   }
 
@@ -90,8 +95,8 @@ export function canAccessCase(req, res, next) {
 
 // Check if user can edit a case
 export function canEditCase(req, res, next) {
-  // Only admin can create/edit cases fully
-  if (req.user.role === 'admin') {
+  // Admin and internal counsel can create/edit cases fully
+  if (hasAdminAccess(req.user)) {
     return next();
   }
 

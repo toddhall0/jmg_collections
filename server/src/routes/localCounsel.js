@@ -25,8 +25,8 @@ router.get('/options', authenticateToken, (req, res) => {
   });
 });
 
-// Get all local counsel contacts (admin only)
-router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Get all local counsel contacts (admin and internal counsel)
+router.get('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { state, status, search } = req.query;
 
   let query = `
@@ -84,7 +84,7 @@ router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Get single local counsel contact
-router.get('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const contact = db.prepare(`
     SELECT lc.*,
            creator.full_name as created_by_name
@@ -120,7 +120,7 @@ router.get('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Create local counsel contact (admin only)
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const {
     firm_name,
     attorney_name,
@@ -241,7 +241,7 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Update local counsel contact (admin only)
-router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const contactId = req.params.id;
 
   const existing = db.prepare('SELECT * FROM local_counsel_contacts WHERE id = ?').get(contactId);
@@ -372,7 +372,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Delete local counsel contact (admin only)
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const contactId = req.params.id;
 
   const existing = db.prepare('SELECT * FROM local_counsel_contacts WHERE id = ?').get(contactId);

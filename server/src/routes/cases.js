@@ -285,11 +285,15 @@ router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
            lc.phone as local_counsel_phone,
            lc.performance_rating as local_counsel_rating,
            lcu.full_name as local_counsel_user_name,
-           lcu.email as local_counsel_user_email
+           lcu.email as local_counsel_user_email,
+           ac.id as assigned_counsel_id,
+           ac.full_name as assigned_counsel_name,
+           ac.email as assigned_counsel_email
     FROM cases c
     LEFT JOIN users creator ON c.created_by = creator.id
     LEFT JOIN local_counsel_contacts lc ON c.assigned_local_counsel_id = lc.id
     LEFT JOIN users lcu ON c.local_counsel_user_id = lcu.id
+    LEFT JOIN users ac ON c.assigned_counsel_id = ac.id
     WHERE c.id = ?
   `).get(req.params.id);
 
@@ -308,8 +312,8 @@ router.get('/:id', authenticateToken, canAccessCase, (req, res) => {
   res.json({ case: caseData, assignments });
 });
 
-// Create case (admin only)
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Create case (admin and internal counsel)
+router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const {
     case_name,
     client_matter_reference,
@@ -520,8 +524,8 @@ router.put('/:id', authenticateToken, canEditCase, (req, res) => {
   res.json({ case: updatedCase, message: 'Case updated successfully' });
 });
 
-// Delete case (admin only)
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+// Delete case (admin and internal counsel)
+router.delete('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.id;
 
   const existingCase = db.prepare('SELECT id FROM cases WHERE id = ?').get(caseId);
@@ -534,7 +538,7 @@ router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Assign local counsel to case
-router.post('/:id/assign', authenticateToken, requireRole('admin'), (req, res) => {
+router.post('/:id/assign', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.id;
   const { user_id } = req.body;
 
@@ -573,7 +577,7 @@ router.post('/:id/assign', authenticateToken, requireRole('admin'), (req, res) =
 });
 
 // Remove local counsel from case
-router.delete('/:id/assign/:userId', authenticateToken, requireRole('admin'), (req, res) => {
+router.delete('/:id/assign/:userId', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { id: caseId, userId } = req.params;
 
   const assignment = db.prepare('SELECT id FROM case_assignments WHERE case_id = ? AND user_id = ?')
@@ -589,8 +593,8 @@ router.delete('/:id/assign/:userId', authenticateToken, requireRole('admin'), (r
   res.json({ message: 'Assignment removed successfully' });
 });
 
-// Assign local counsel from directory to a case (admin only)
-router.post('/:id/local-counsel', authenticateToken, requireRole('admin'), (req, res) => {
+// Assign local counsel from directory to a case (admin and internal counsel)
+router.post('/:id/local-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.id;
   const {
     local_counsel_id,
@@ -661,8 +665,8 @@ router.post('/:id/local-counsel', authenticateToken, requireRole('admin'), (req,
   }
 });
 
-// Remove local counsel from a case (admin only)
-router.delete('/:id/local-counsel', authenticateToken, requireRole('admin'), (req, res) => {
+// Remove local counsel from a case (admin and internal counsel)
+router.delete('/:id/local-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.id;
 
   const caseData = db.prepare('SELECT id, assigned_local_counsel_id FROM cases WHERE id = ?').get(caseId);
@@ -695,6 +699,86 @@ router.delete('/:id/local-counsel', authenticateToken, requireRole('admin'), (re
   } catch (error) {
     console.error('Error removing local counsel:', error);
     res.status(500).json({ error: 'Failed to remove local counsel' });
+  }
+});
+
+// Assign internal counsel (assigned attorney) to a case
+router.post('/:id/assigned-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
+  const caseId = req.params.id;
+  const { user_id } = req.body;
+
+  // Verify case exists
+  const caseData = db.prepare('SELECT id FROM cases WHERE id = ?').get(caseId);
+  if (!caseData) {
+    return res.status(404).json({ error: 'Case not found' });
+  }
+
+  // Verify user exists and is admin or internal_counsel
+  if (user_id) {
+    const user = db.prepare('SELECT id, role, full_name FROM users WHERE id = ?').get(user_id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (user.role !== 'admin' && user.role !== 'internal_counsel') {
+      return res.status(400).json({ error: 'User must be an admin or internal counsel' });
+    }
+  }
+
+  try {
+    db.prepare(`
+      UPDATE cases SET
+        assigned_counsel_id = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(user_id || null, caseId);
+
+    // Create a note about the assignment
+    if (user_id) {
+      const user = db.prepare('SELECT full_name FROM users WHERE id = ?').get(user_id);
+      const noteContent = `Assigned counsel set to: ${user.full_name}`;
+      db.prepare(`
+        INSERT INTO case_notes (case_id, content, created_by)
+        VALUES (?, ?, ?)
+      `).run(caseId, noteContent, req.user.id);
+    }
+
+    res.json({ message: 'Assigned counsel updated successfully' });
+  } catch (error) {
+    console.error('Error assigning counsel:', error);
+    res.status(500).json({ error: 'Failed to assign counsel' });
+  }
+});
+
+// Remove assigned counsel from a case
+router.delete('/:id/assigned-counsel', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
+  const caseId = req.params.id;
+
+  const caseData = db.prepare('SELECT id, assigned_counsel_id FROM cases WHERE id = ?').get(caseId);
+  if (!caseData) {
+    return res.status(404).json({ error: 'Case not found' });
+  }
+
+  if (!caseData.assigned_counsel_id) {
+    return res.status(400).json({ error: 'No assigned counsel on this case' });
+  }
+
+  try {
+    db.prepare(`
+      UPDATE cases SET
+        assigned_counsel_id = NULL,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(caseId);
+
+    db.prepare(`
+      INSERT INTO case_notes (case_id, content, created_by)
+      VALUES (?, 'Assigned counsel removed from case', ?)
+    `).run(caseId, req.user.id);
+
+    res.json({ message: 'Assigned counsel removed successfully' });
+  } catch (error) {
+    console.error('Error removing assigned counsel:', error);
+    res.status(500).json({ error: 'Failed to remove assigned counsel' });
   }
 });
 
