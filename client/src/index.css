@@ -778,6 +778,40 @@ tr:hover {
   background-color: var(--gray-50);
 }
 
+/* Task Management */
+.overdue-row {
+  background-color: #fff5f5;
+}
+
+.overdue-row:hover {
+  background-color: #fed7d7;
+}
+
+.badge-info {
+  background: #bee3f8;
+  color: #2c5282;
+}
+
+.badge-warning {
+  background: #fefcbf;
+  color: #975a16;
+}
+
+.badge-danger {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.badge-success {
+  background: #c6f6d5;
+  color: #276749;
+}
+
+.badge-secondary {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {

@@ -18,6 +18,7 @@ import NotificationSettings from './pages/NotificationSettings'
 import AuditLog from './pages/AuditLog'
 import Categories from './pages/Categories'
 import SearchResults from './pages/SearchResults'
+import TaskManagement from './pages/TaskManagement'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="cases/:id/edit" element={<AdminRoute><CaseForm /></AdminRoute>} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="deadlines" element={<Deadlines />} />
+        <Route path="tasks" element={<AdminRoute><TaskManagement /></AdminRoute>} />
         <Route path="local-counsel" element={<AdminRoute><LocalCounselDirectory /></AdminRoute>} />
         <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
         <Route path="templates" element={<AdminRoute><Templates /></AdminRoute>} />

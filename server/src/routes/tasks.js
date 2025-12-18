@@ -78,6 +78,38 @@ router.get('/my-tasks', authenticateToken, (req, res) => {
   res.json({ tasks });
 });
 
+// Get all tasks (for Task Management page - admin/internal_counsel only)
+router.get('/all', authenticateToken, (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'internal_counsel') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const tasks = db.prepare(`
+    SELECT t.*,
+           c.case_number,
+           c.case_name,
+           c.defendant_name,
+           cc.name as category_name,
+           cc.code as category_code,
+           assignee.full_name as assigned_to_name,
+           creator.full_name as created_by_name,
+           CASE
+             WHEN t.due_date < ? AND t.status != 'Complete' THEN 1
+             ELSE 0
+           END as is_overdue
+    FROM tasks t
+    JOIN cases c ON t.case_id = c.id
+    LEFT JOIN case_categories cc ON c.category_id = cc.id
+    JOIN users assignee ON t.assigned_to = assignee.id
+    JOIN users creator ON t.created_by = creator.id
+    ORDER BY t.due_date ASC, t.priority DESC
+  `).all(today);
+
+  res.json({ tasks });
+});
+
 // Create a new task
 router.post('/case/:caseId', authenticateToken, canAccessCase, (req, res) => {
   const { caseId } = req.params;
