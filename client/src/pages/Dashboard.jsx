@@ -29,6 +29,20 @@ function AdminDashboard({ user }) {
   const [categoryStats, setCategoryStats] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // New Task Modal state
+  const [showTaskModal, setShowTaskModal] = useState(false)
+  const [cases, setCases] = useState([])
+  const [users, setUsers] = useState([])
+  const [taskSubmitting, setTaskSubmitting] = useState(false)
+  const [taskError, setTaskError] = useState('')
+  const [taskForm, setTaskForm] = useState({
+    case_id: '',
+    description: '',
+    assigned_to: '',
+    due_date: new Date().toISOString().split('T')[0],
+    priority: 'Medium'
+  })
+
   useEffect(() => {
     loadData()
   }, [])
@@ -51,6 +65,59 @@ function AdminDashboard({ user }) {
       console.error('Error loading dashboard:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openTaskModal = async () => {
+    try {
+      const [casesData, usersData] = await Promise.all([
+        api.get('/cases?resolution_status=Open'),
+        api.get('/users')
+      ])
+      setCases(casesData.cases || [])
+      setUsers(usersData.users?.filter(u => u.active) || [])
+      setShowTaskModal(true)
+    } catch (error) {
+      console.error('Error loading data for task modal:', error)
+    }
+  }
+
+  const closeTaskModal = () => {
+    setShowTaskModal(false)
+    setTaskForm({
+      case_id: '',
+      description: '',
+      assigned_to: '',
+      due_date: new Date().toISOString().split('T')[0],
+      priority: 'Medium'
+    })
+    setTaskError('')
+  }
+
+  const handleTaskSubmit = async (e) => {
+    e.preventDefault()
+    if (!taskForm.case_id || !taskForm.description || !taskForm.assigned_to) {
+      setTaskError('Please fill in all required fields')
+      return
+    }
+
+    setTaskSubmitting(true)
+    setTaskError('')
+
+    try {
+      await api.post(`/tasks/case/${taskForm.case_id}`, {
+        description: taskForm.description,
+        assigned_to: parseInt(taskForm.assigned_to),
+        due_date: taskForm.due_date,
+        priority: taskForm.priority,
+        status: 'Not Started'
+      })
+      closeTaskModal()
+      loadData() // Refresh activity feed
+    } catch (error) {
+      setTaskError(error.message || 'Failed to create task')
+    } finally {
+      setTaskSubmitting(false)
     }
   }
 
@@ -81,7 +148,10 @@ function AdminDashboard({ user }) {
             Welcome back, {user?.full_name}
           </p>
         </div>
-        <Link to="/cases/new" className="btn btn-primary">+ New Case</Link>
+        <div className="actions">
+          <button onClick={openTaskModal} className="btn btn-secondary">+ New Task</button>
+          <Link to="/cases/new" className="btn btn-primary">+ New Case</Link>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -312,6 +382,96 @@ function AdminDashboard({ user }) {
           </div>
         )}
       </div>
+
+      {/* New Task Modal */}
+      {showTaskModal && (
+        <div className="modal-backdrop" onClick={closeTaskModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Create New Task</h2>
+              <button className="modal-close" onClick={closeTaskModal}>&times;</button>
+            </div>
+            <form onSubmit={handleTaskSubmit}>
+              <div className="modal-body">
+                {taskError && <div className="alert alert-error">{taskError}</div>}
+
+                <div className="form-group">
+                  <label>Case *</label>
+                  <select
+                    value={taskForm.case_id}
+                    onChange={(e) => setTaskForm({ ...taskForm, case_id: e.target.value })}
+                    required
+                  >
+                    <option value="">Select a case...</option>
+                    {cases.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.case_number} - {c.defendant_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Description *</label>
+                  <textarea
+                    value={taskForm.description}
+                    onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                    required
+                    rows={3}
+                    placeholder="Enter task description..."
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Assign To *</label>
+                    <select
+                      value={taskForm.assigned_to}
+                      onChange={(e) => setTaskForm({ ...taskForm, assigned_to: e.target.value })}
+                      required
+                    >
+                      <option value="">Select user...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Due Date *</label>
+                    <input
+                      type="date"
+                      value={taskForm.due_date}
+                      onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Priority</label>
+                    <select
+                      value={taskForm.priority}
+                      onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
+                    >
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeTaskModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={taskSubmitting}>
+                  {taskSubmitting ? 'Creating...' : 'Create Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
