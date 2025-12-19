@@ -366,21 +366,21 @@ function initializeDatabase() {
       {
         name: 'Partner Violation',
         code: 'PV',
-        description: 'Claims arising from violations of partner agreements',
+        description: 'Defendant working with JMG partner in violation of ICA',
         default_claim_language: 'This claim arises from a violation of the partnership agreement between the parties. The defendant has breached their obligations under the agreement by failing to comply with the terms and conditions set forth therein.',
         display_order: 1
       },
       {
         name: 'Company Referral Violation',
         code: 'CRV',
-        description: 'Claims arising from violations of company referral fee agreements',
+        description: 'Defendant working with Company referrals without Company consent in violation of ICA',
         default_claim_language: 'This claim arises from a violation of the referral fee agreement between the parties. The defendant has failed to pay the agreed-upon referral fees as required under the terms of the agreement.',
         display_order: 2
       },
       {
         name: 'Early Termination Fee',
         code: 'ETF',
-        description: 'Claims for early termination fees under contract',
+        description: 'Defendant failed to pay early termination fee under ICA',
         default_claim_language: 'This claim is for early termination fees owed pursuant to the contract between the parties. The defendant terminated the agreement prior to the end of the contract term without paying the required early termination fee.',
         display_order: 3
       },
@@ -402,6 +402,16 @@ function initializeDatabase() {
       insertCategory.run(cat.name, cat.code, cat.description, cat.default_claim_language, cat.display_order);
     }
     console.log('Default case categories created');
+  }
+
+  // Migration: Update category descriptions to new ICA-focused descriptions
+  const pvCategory = db.prepare("SELECT description FROM case_categories WHERE code = 'PV'").get();
+  if (pvCategory && pvCategory.description === 'Claims arising from violations of partner agreements') {
+    console.log('Updating category descriptions...');
+    db.prepare("UPDATE case_categories SET description = 'Defendant working with JMG partner in violation of ICA' WHERE code = 'PV'").run();
+    db.prepare("UPDATE case_categories SET description = 'Defendant working with Company referrals without Company consent in violation of ICA' WHERE code = 'CRV'").run();
+    db.prepare("UPDATE case_categories SET description = 'Defendant failed to pay early termination fee under ICA' WHERE code = 'ETF'").run();
+    console.log('Category descriptions updated');
   }
 
   // Migration: Fix users table CHECK constraint to include 'internal_counsel'
