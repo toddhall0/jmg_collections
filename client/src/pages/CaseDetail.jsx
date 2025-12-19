@@ -342,6 +342,11 @@ export default function CaseDetail() {
               )}
             </div>
           </div>
+
+          {/* Tasks section - in same column as case details */}
+          <div style={{ marginTop: '24px' }}>
+            <CaseTasks caseId={id} />
+          </div>
         </div>
 
         <div>
@@ -463,11 +468,6 @@ export default function CaseDetail() {
           {/* Share Link */}
           <ShareLink caseId={id} />
         </div>
-      </div>
-
-      {/* Tasks section */}
-      <div style={{ marginTop: '24px' }}>
-        <CaseTasks caseId={id} />
       </div>
 
       {/* Notes, Communications, and Documents sections */}
