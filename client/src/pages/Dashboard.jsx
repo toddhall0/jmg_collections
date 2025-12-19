@@ -389,7 +389,7 @@ function AdminDashboard({ user }) {
 
       {/* New Task Modal */}
       {showTaskModal && (
-        <div className="modal-backdrop" onClick={closeTaskModal}>
+        <div className="modal-overlay" onClick={closeTaskModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Create New Task</h2>
