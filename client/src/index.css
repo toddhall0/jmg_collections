@@ -787,6 +787,14 @@ tr:hover {
   background-color: #fed7d7;
 }
 
+.stuck-row {
+  background-color: #fffbeb;
+}
+
+.stuck-row:hover {
+  background-color: #fef3c7;
+}
+
 .badge-info {
   background: #bee3f8;
   color: #2c5282;

@@ -139,10 +139,26 @@ function initializeDatabase() {
       assigned_to INTEGER NOT NULL REFERENCES users(id),
       due_date TEXT NOT NULL,
       priority TEXT NOT NULL DEFAULT 'Medium' CHECK(priority IN ('High', 'Medium', 'Low')),
-      status TEXT NOT NULL DEFAULT 'Not Started' CHECK(status IN ('Not Started', 'In Progress', 'Complete')),
+      status TEXT NOT NULL DEFAULT 'Not Started' CHECK(status IN ('Not Started', 'In Progress', 'Stuck', 'Complete')),
+      notes TEXT,
       created_by INTEGER NOT NULL REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Task Documents table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS task_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      file_name TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER,
+      mime_type TEXT,
+      uploaded_by INTEGER NOT NULL REFERENCES users(id),
+      uploaded_at TEXT DEFAULT (datetime('now'))
     )
   `);
 
@@ -429,6 +445,51 @@ function initializeDatabase() {
     db.pragma('foreign_keys = ON');
 
     console.log('Users table migration complete');
+  }
+
+  // Migration: Add notes column to tasks table
+  const taskColumns = db.prepare("PRAGMA table_info(tasks)").all();
+  const taskColumnNames = taskColumns.map(c => c.name);
+  if (!taskColumnNames.includes('notes')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN notes TEXT`);
+    console.log('Added notes column to tasks table');
+  }
+
+  // Migration: Fix tasks table CHECK constraint to include 'Stuck' status
+  const tasksTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").get();
+  if (tasksTableInfo && tasksTableInfo.sql && !tasksTableInfo.sql.includes('Stuck')) {
+    console.log('Migrating tasks table to add Stuck status...');
+
+    db.pragma('foreign_keys = OFF');
+
+    db.exec(`
+      DROP TABLE IF EXISTS tasks_new;
+
+      CREATE TABLE tasks_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        assigned_to INTEGER NOT NULL REFERENCES users(id),
+        due_date TEXT NOT NULL,
+        priority TEXT NOT NULL DEFAULT 'Medium' CHECK(priority IN ('High', 'Medium', 'Low')),
+        status TEXT NOT NULL DEFAULT 'Not Started' CHECK(status IN ('Not Started', 'In Progress', 'Stuck', 'Complete')),
+        notes TEXT,
+        created_by INTEGER NOT NULL REFERENCES users(id),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO tasks_new (id, case_id, description, assigned_to, due_date, priority, status, notes, created_by, created_at, updated_at)
+      SELECT id, case_id, description, assigned_to, due_date, priority, status, notes, created_by, created_at, updated_at FROM tasks;
+
+      DROP TABLE tasks;
+
+      ALTER TABLE tasks_new RENAME TO tasks;
+    `);
+
+    db.pragma('foreign_keys = ON');
+
+    console.log('Tasks table migration complete');
   }
 
   // Create default admin user if no users exist
