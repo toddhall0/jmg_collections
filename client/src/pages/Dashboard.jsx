@@ -69,16 +69,20 @@ function AdminDashboard({ user }) {
   }
 
   const openTaskModal = async () => {
+    setShowTaskModal(true)
+    setTaskError('')
     try {
       const [casesData, usersData] = await Promise.all([
-        api.get('/cases?resolution_status=Open'),
+        api.get('/cases'),
         api.get('/users')
       ])
-      setCases(casesData.cases || [])
+      // Filter to only open cases
+      const openCases = (casesData.cases || []).filter(c => c.resolution_status === 'Open')
+      setCases(openCases)
       setUsers(usersData.users?.filter(u => u.active) || [])
-      setShowTaskModal(true)
     } catch (error) {
       console.error('Error loading data for task modal:', error)
+      setTaskError('Failed to load cases or users. Please try again.')
     }
   }
 
