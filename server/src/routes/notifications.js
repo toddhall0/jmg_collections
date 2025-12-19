@@ -159,8 +159,8 @@ router.put('/preferences', authenticateToken, (req, res) => {
   res.json({ message: 'Preferences updated' });
 });
 
-// Trigger check for overdue tasks and deadlines (admin only, for testing or manual trigger)
-router.post('/check-reminders', authenticateToken, requireRole('admin'), (req, res) => {
+// Trigger check for overdue tasks and deadlines (admin and internal counsel, for testing or manual trigger)
+router.post('/check-reminders', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   try {
     checkOverdueTasks();
     checkUpcomingDeadlines();

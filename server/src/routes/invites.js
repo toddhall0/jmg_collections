@@ -6,8 +6,8 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// Create an invite (admin only)
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Create an invite (admin and internal counsel)
+router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { email, role } = req.body;
 
   if (!email || !role) {
@@ -72,8 +72,8 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
   }
 });
 
-// Get all pending invites (admin only)
-router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Get all pending invites (admin and internal counsel)
+router.get('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const invites = db.prepare(`
     SELECT i.*, u.full_name as invited_by_name
     FROM user_invites i
@@ -92,8 +92,8 @@ router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
   res.json({ invites });
 });
 
-// Revoke an invite (admin only)
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+// Revoke an invite (admin and internal counsel)
+router.delete('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const invite = db.prepare('SELECT id FROM user_invites WHERE id = ? AND used_at IS NULL').get(req.params.id);
 
   if (!invite) {
@@ -204,8 +204,8 @@ router.post('/register/:token', (req, res) => {
   }
 });
 
-// Resend/regenerate an invite (admin only)
-router.post('/:id/resend', authenticateToken, requireRole('admin'), (req, res) => {
+// Resend/regenerate an invite (admin and internal counsel)
+router.post('/:id/resend', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const invite = db.prepare('SELECT * FROM user_invites WHERE id = ? AND used_at IS NULL').get(req.params.id);
 
   if (!invite) {

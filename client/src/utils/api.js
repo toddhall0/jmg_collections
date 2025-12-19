@@ -14,7 +14,9 @@ async function request(endpoint, options = {}) {
 
   const response = await fetch(`${API_BASE}${endpoint}`, config)
 
-  if (response.status === 401 || response.status === 403) {
+  // Only redirect to login on 401 (unauthorized/invalid token)
+  // 403 means user is authenticated but lacks permission - don't force re-login
+  if (response.status === 401) {
     if (endpoint !== '/auth/login' && endpoint !== '/auth/me') {
       localStorage.removeItem('token')
       window.location.href = '/login'

@@ -5,8 +5,8 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// Get all users (admin only)
-router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Get all users (admin and internal counsel)
+router.get('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const users = db.prepare(`
     SELECT id, username, email, full_name, role, active, created_at
     FROM users ORDER BY created_at DESC
@@ -38,7 +38,7 @@ router.get('/internal-counsel', authenticateToken, requireRole('admin', 'interna
 });
 
 // Get single user
-router.get('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const user = db.prepare(`
     SELECT id, username, email, full_name, role, active, created_at
     FROM users WHERE id = ?
@@ -51,8 +51,8 @@ router.get('/:id', authenticateToken, requireRole('admin'), (req, res) => {
   res.json({ user });
 });
 
-// Create user (admin only)
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Create user (admin and internal counsel)
+router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { username, email, password, full_name, role } = req.body;
 
   if (!username || !email || !password || !full_name || !role) {
@@ -94,8 +94,8 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
   }
 });
 
-// Update user (admin only)
-router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+// Update user (admin and internal counsel)
+router.put('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { username, email, full_name, role, active, password } = req.body;
   const userId = req.params.id;
 
@@ -145,8 +145,8 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
   res.json({ user, message: 'User updated successfully' });
 });
 
-// Delete user (admin only)
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+// Delete user (admin and internal counsel)
+router.delete('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const userId = req.params.id;
 
   // Prevent deleting yourself

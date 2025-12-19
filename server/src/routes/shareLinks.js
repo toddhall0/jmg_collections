@@ -5,8 +5,8 @@ import crypto from 'crypto';
 
 const router = Router();
 
-// Generate a share link for a case (admin only)
-router.post('/case/:caseId', authenticateToken, requireRole('admin'), (req, res) => {
+// Generate a share link for a case (admin and internal counsel)
+router.post('/case/:caseId', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.caseId;
 
   // Check case exists
@@ -49,8 +49,8 @@ router.post('/case/:caseId', authenticateToken, requireRole('admin'), (req, res)
   }
 });
 
-// Get active share link for a case (admin only)
-router.get('/case/:caseId', authenticateToken, requireRole('admin'), (req, res) => {
+// Get active share link for a case (admin and internal counsel)
+router.get('/case/:caseId', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const caseId = req.params.caseId;
 
   const shareLink = db.prepare(`
@@ -72,8 +72,8 @@ router.get('/case/:caseId', authenticateToken, requireRole('admin'), (req, res) 
   });
 });
 
-// Revoke a share link (admin only)
-router.delete('/:linkId', authenticateToken, requireRole('admin'), (req, res) => {
+// Revoke a share link (admin and internal counsel)
+router.delete('/:linkId', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const linkId = req.params.linkId;
 
   const existing = db.prepare('SELECT * FROM case_share_links WHERE id = ?').get(linkId);

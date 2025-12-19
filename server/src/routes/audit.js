@@ -4,8 +4,8 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// Get audit logs (admin only)
-router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
+// Get audit logs (admin and internal counsel)
+router.get('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const {
     limit = 50,
     offset = 0,
@@ -104,7 +104,7 @@ router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Get audit log statistics
-router.get('/stats', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/stats', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { days = 30 } = req.query;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - parseInt(days));
@@ -166,7 +166,7 @@ router.get('/stats', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Get unique action types
-router.get('/action-types', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/action-types', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const actions = db.prepare(`
     SELECT DISTINCT action FROM audit_logs ORDER BY action
   `).all();
@@ -175,7 +175,7 @@ router.get('/action-types', authenticateToken, requireRole('admin'), (req, res) 
 });
 
 // Get unique entity types
-router.get('/entity-types', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/entity-types', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const entities = db.prepare(`
     SELECT DISTINCT entity_type FROM audit_logs ORDER BY entity_type
   `).all();
@@ -184,7 +184,7 @@ router.get('/entity-types', authenticateToken, requireRole('admin'), (req, res) 
 });
 
 // Export audit logs as CSV
-router.get('/export', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/export', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { start_date, end_date, action, entity_type } = req.query;
 
   let conditions = [];

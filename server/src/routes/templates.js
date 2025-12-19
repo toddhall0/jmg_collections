@@ -49,7 +49,7 @@ router.get('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), 
 });
 
 // Create template
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { name, template_type, content, description, is_active, category_id } = req.body;
 
   if (!name || !template_type || !content) {
@@ -73,7 +73,7 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Update template
-router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const { name, template_type, content, description, is_active, category_id } = req.body;
 
   const template = db.prepare('SELECT * FROM document_templates WHERE id = ?').get(req.params.id);
@@ -104,7 +104,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // Delete template
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'internal_counsel'), (req, res) => {
   const template = db.prepare('SELECT * FROM document_templates WHERE id = ?').get(req.params.id);
   if (!template) {
     return res.status(404).json({ error: 'Template not found' });
