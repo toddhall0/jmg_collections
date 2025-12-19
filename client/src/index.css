@@ -779,6 +779,36 @@ tr:hover {
 }
 
 /* Task Management */
+.task-management-page .table-container {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.task-management-page table {
+  min-width: 1200px;
+  width: 100%;
+}
+
+.task-management-page th,
+.task-management-page td {
+  white-space: nowrap;
+  padding: 0.75rem 1rem;
+}
+
+.task-management-page td:nth-child(2) {
+  /* Description column - allow wrapping */
+  white-space: normal;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.task-management-page td:nth-child(6) {
+  /* Notes column - allow wrapping */
+  white-space: normal;
+  min-width: 150px;
+  max-width: 250px;
+}
+
 .overdue-row {
   background-color: #fff5f5;
 }

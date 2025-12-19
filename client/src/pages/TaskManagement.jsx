@@ -401,7 +401,7 @@ export default function TaskManagement() {
   const completedTasks = tasks.filter(t => t.status === 'Complete').length
 
   return (
-    <div>
+    <div className="task-management-page">
       <div className="page-header">
         <h1>Task Management</h1>
       </div>
