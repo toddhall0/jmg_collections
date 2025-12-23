@@ -359,8 +359,8 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
     second_notice_response_deadline
   } = req.body;
 
-  // Validation
-  if (!case_name || !defendant_name || !defendant_entity_type || !amount_claimed) {
+  // Validation - allow zero for amount_claimed
+  if (!case_name || !defendant_name || !defendant_entity_type || amount_claimed === undefined || amount_claimed === null || amount_claimed === '') {
     return res.status(400).json({ error: 'Case name, defendant name, defendant entity type, and amount claimed are required' });
   }
 
