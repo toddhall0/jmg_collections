@@ -4,7 +4,7 @@ import NotificationBell from './NotificationBell'
 import GlobalSearch from './GlobalSearch'
 
 export default function Layout() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, isClient } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -32,22 +32,26 @@ export default function Layout() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"/>
             </svg>
-            All Cases
+            {isClient ? 'My Cases' : 'All Cases'}
           </NavLink>
 
-          <NavLink to="/pipeline" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/>
-            </svg>
-            Pipeline
-          </NavLink>
+          {!isClient && (
+            <>
+              <NavLink to="/pipeline" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/>
+                </svg>
+                Pipeline
+              </NavLink>
 
-          <NavLink to="/deadlines" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
-            </svg>
-            Deadlines
-          </NavLink>
+              <NavLink to="/deadlines" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+                </svg>
+                Deadlines
+              </NavLink>
+            </>
+          )}
 
           {isAdmin && (
             <>
@@ -101,7 +105,7 @@ export default function Layout() {
           <div className="user-info">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span>{user?.full_name}</span>
-              <NotificationBell />
+              {!isClient && <NotificationBell />}
             </div>
             <div className="user-role">{user?.role?.replace('_', ' ')}</div>
           </div>
@@ -113,7 +117,7 @@ export default function Layout() {
 
       <main className="main-content">
         <div className="main-header">
-          <GlobalSearch />
+          {!isClient && <GlobalSearch />}
         </div>
         <div className="main-body">
           <Outlet />

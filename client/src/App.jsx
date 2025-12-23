@@ -52,6 +52,25 @@ function AdminRoute({ children }) {
   return children
 }
 
+// Staff route - allows admin, internal_counsel, local_counsel but NOT clients
+function StaffRoute({ children }) {
+  const { user, loading, isClient } = useAuth()
+
+  if (loading) {
+    return <div className="loading">Loading...</div>
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (isClient) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return children
+}
+
 export default function App() {
   return (
     <Routes>
@@ -74,17 +93,17 @@ export default function App() {
         <Route path="cases/new" element={<AdminRoute><CaseForm /></AdminRoute>} />
         <Route path="cases/:id" element={<CaseDetail />} />
         <Route path="cases/:id/edit" element={<AdminRoute><CaseForm /></AdminRoute>} />
-        <Route path="pipeline" element={<Pipeline />} />
-        <Route path="deadlines" element={<Deadlines />} />
+        <Route path="pipeline" element={<StaffRoute><Pipeline /></StaffRoute>} />
+        <Route path="deadlines" element={<StaffRoute><Deadlines /></StaffRoute>} />
         <Route path="tasks" element={<AdminRoute><TaskManagement /></AdminRoute>} />
         <Route path="local-counsel" element={<AdminRoute><LocalCounselDirectory /></AdminRoute>} />
         <Route path="reports" element={<AdminRoute><Reports /></AdminRoute>} />
         <Route path="templates" element={<AdminRoute><Templates /></AdminRoute>} />
         <Route path="categories" element={<AdminRoute><Categories /></AdminRoute>} />
-        <Route path="settings/notifications" element={<NotificationSettings />} />
+        <Route path="settings/notifications" element={<StaffRoute><NotificationSettings /></StaffRoute>} />
         <Route path="audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
         <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
-        <Route path="search" element={<SearchResults />} />
+        <Route path="search" element={<StaffRoute><SearchResults /></StaffRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
