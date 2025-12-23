@@ -24,6 +24,9 @@ export default function CaseDetail() {
   const [selectedCounsel, setSelectedCounsel] = useState('')
   const [options, setOptions] = useState({ stages: [], resolution_statuses: [] })
   const [updating, setUpdating] = useState(false)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState(null)
+  const [statusDate, setStatusDate] = useState('')
 
   const { isAdmin, isClient, isLocalCounsel } = useAuth()
 
@@ -115,11 +118,38 @@ export default function CaseDetail() {
   }
 
   const handleStatusUpdate = async (newStatus) => {
+    // If changing to a closed status, show modal to enter date
+    if (newStatus !== 'Open') {
+      setPendingStatus(newStatus)
+      setStatusDate(caseData.date_closed || new Date().toISOString().split('T')[0])
+      setShowStatusModal(true)
+      return
+    }
+
+    // If changing back to Open, just update directly
     setUpdating(true)
     try {
-      const updates = { resolution_status: newStatus }
-      if (newStatus !== 'Open' && !caseData.date_closed) {
-        updates.date_closed = new Date().toISOString().split('T')[0]
+      await api.put(`/cases/${id}`, { resolution_status: newStatus })
+      setCaseData(prev => ({ ...prev, resolution_status: newStatus }))
+    } catch (err) {
+      alert('Failed to update status: ' + err.message)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const confirmStatusUpdate = async () => {
+    if (!statusDate) {
+      alert('Please enter a date')
+      return
+    }
+
+    setUpdating(true)
+    setShowStatusModal(false)
+    try {
+      const updates = {
+        resolution_status: pendingStatus,
+        date_closed: statusDate
       }
       await api.put(`/cases/${id}`, updates)
       setCaseData(prev => ({ ...prev, ...updates }))
@@ -127,7 +157,14 @@ export default function CaseDetail() {
       alert('Failed to update status: ' + err.message)
     } finally {
       setUpdating(false)
+      setPendingStatus(null)
     }
+  }
+
+  const cancelStatusUpdate = () => {
+    setShowStatusModal(false)
+    setPendingStatus(null)
+    setStatusDate('')
   }
 
   const getStatusBadgeClass = (status) => {
@@ -479,6 +516,45 @@ export default function CaseDetail() {
       <div style={{ marginTop: '24px' }}>
         <CaseDocuments caseId={id} />
       </div>
+
+      {/* Status Change Modal */}
+      {showStatusModal && (
+        <div className="modal-overlay" onClick={cancelStatusUpdate}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Change Status to {pendingStatus}</h2>
+              <button className="modal-close" onClick={cancelStatusUpdate}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Date Closed *</label>
+                <input
+                  type="date"
+                  value={statusDate}
+                  onChange={(e) => setStatusDate(e.target.value)}
+                  required
+                />
+                <small style={{ color: 'var(--gray-500)', marginTop: '4px', display: 'block' }}>
+                  Enter the date this case was {pendingStatus?.toLowerCase()}
+                </small>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={cancelStatusUpdate}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmStatusUpdate}
+                disabled={updating || !statusDate}
+              >
+                {updating ? 'Updating...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
