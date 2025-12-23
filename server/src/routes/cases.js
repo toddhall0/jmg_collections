@@ -451,6 +451,83 @@ router.post('/', authenticateToken, requireRole('admin', 'internal_counsel'), (r
   }
 });
 
+// Client matter request - allows clients to submit new cases
+router.post('/client-request', authenticateToken, (req, res) => {
+  // Only allow client users to use this endpoint
+  if (req.user.role !== 'client') {
+    return res.status(403).json({ error: 'This endpoint is only for client users' });
+  }
+
+  const {
+    case_name,
+    category_id,
+    defendant_name,
+    defendant_entity_type,
+    defendant_contact_name,
+    defendant_email,
+    defendant_phone,
+    defendant_mailing_address,
+    defendant_state,
+    amount_claimed,
+    date_claim_arose,
+    claim_description
+  } = req.body;
+
+  // Validation - allow zero for amount_claimed
+  if (!case_name || !defendant_name || !defendant_entity_type || amount_claimed === undefined || amount_claimed === null || amount_claimed === '') {
+    return res.status(400).json({ error: 'Matter name, defendant name, defendant entity type, and amount claimed are required' });
+  }
+
+  if (!VALID_ENTITY_TYPES.includes(defendant_entity_type)) {
+    return res.status(400).json({ error: 'Invalid defendant entity type' });
+  }
+
+  if (defendant_state && !US_STATES.includes(defendant_state.toUpperCase())) {
+    return res.status(400).json({ error: 'Invalid state' });
+  }
+
+  const case_number = generateCaseNumber();
+
+  try {
+    const result = db.prepare(`
+      INSERT INTO cases (
+        case_number, case_name, category_id, defendant_name, defendant_entity_type,
+        defendant_contact_name, defendant_email, defendant_phone, defendant_mailing_address,
+        defendant_state, amount_claimed, date_claim_arose, claim_description,
+        current_stage, resolution_status, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      case_number,
+      case_name,
+      category_id || null,
+      defendant_name,
+      defendant_entity_type,
+      defendant_contact_name || null,
+      defendant_email || null,
+      defendant_phone || null,
+      defendant_mailing_address || null,
+      defendant_state ? defendant_state.toUpperCase() : null,
+      amount_claimed,
+      date_claim_arose || null,
+      claim_description || null,
+      'Intake', // Always starts at Intake
+      'Open',   // Always Open
+      req.user.id
+    );
+
+    logAudit(req, 'CREATE', 'case', result.lastInsertRowid, case_name, {
+      case_number,
+      submitted_by_client: true
+    });
+
+    const newCase = db.prepare('SELECT * FROM cases WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ case: newCase, message: 'Matter request submitted successfully' });
+  } catch (error) {
+    console.error('Error creating client case request:', error);
+    res.status(500).json({ error: 'Failed to submit matter request' });
+  }
+});
+
 // Update case
 router.put('/:id', authenticateToken, canEditCase, (req, res) => {
   const caseId = req.params.id;

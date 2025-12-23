@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../utils/api'
 import { formatCurrency, formatDate, formatDateTime } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
+import ClientMatterForm from '../components/ClientMatterForm'
 
 export default function Dashboard() {
   const { user, isAdmin, isLocalCounsel, isClient } = useAuth()
@@ -483,6 +484,7 @@ function AdminDashboard({ user }) {
 function ClientDashboard({ user }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showMatterModal, setShowMatterModal] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -497,6 +499,10 @@ function ClientDashboard({ user }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleMatterSuccess = () => {
+    loadData() // Refresh the dashboard after submitting a new matter
   }
 
   if (loading) {
@@ -523,6 +529,9 @@ function ClientDashboard({ user }) {
             Welcome back, {user?.full_name}
           </p>
         </div>
+        <button onClick={() => setShowMatterModal(true)} className="btn btn-primary">
+          + New Matter Request
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -596,6 +605,14 @@ function ClientDashboard({ user }) {
           </div>
         )}
       </div>
+
+      {/* New Matter Request Modal */}
+      {showMatterModal && (
+        <ClientMatterForm
+          onClose={() => setShowMatterModal(false)}
+          onSuccess={handleMatterSuccess}
+        />
+      )}
     </div>
   )
 }
